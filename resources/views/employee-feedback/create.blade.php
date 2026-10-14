@@ -1,0 +1,16 @@
+<x-app-layout>
+    <x-slot name="header">
+        <x-admin.page-header title="Submit Employee Feedback" description="Report incidents, operational concerns, and suggestions for internal review." icon="messages-square" />
+    </x-slot>
+
+    <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+        <form method="POST" action="{{ route('employee-feedback.store') }}" enctype="multipart/form-data" class="space-y-6">
+            @csrf
+            <x-employee-feedback.form-fields :departments="$departments" :categories="$categories" :priorities="$priorities" />
+            <div class="flex flex-wrap gap-3">
+                <x-primary-button>Submit Feedback</x-primary-button>
+                <a href="{{ route('employee-feedback.index') }}" class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">Cancel</a>
+            </div>
+        </form>
+    </section>
+</x-app-layout>
