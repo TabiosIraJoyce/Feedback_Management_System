@@ -204,11 +204,9 @@
                             autocomplete="tel"
                             pattern="(?=(?:\D*\d){7})[0-9+().\s-]{7,20}"
                             title="Enter at least 7 digits. You may include +, spaces, parentheses, dots, or hyphens."
-                            aria-describedby="customer_phone_help"
                             class="min-h-12 w-full rounded-lg border-gray-300 px-3 text-base focus:border-blue-500 focus:ring-blue-500"
                             required
                         >
-                        <p id="customer_phone_help" class="mt-1 text-sm leading-5 text-gray-600">Enter at least 7 digits. Spaces, +, parentheses, dots, and hyphens are okay.</p>
                         <x-input-error :messages="$errors->get('customer_phone')" class="mt-2 text-sm" />
                     </div>
 
@@ -227,11 +225,9 @@
                             value="{{ old('customer_email') }}"
                             placeholder="example@email.com"
                             autocomplete="email"
-                            aria-describedby="customer_email_help"
                             class="min-h-12 w-full rounded-lg border-gray-300 px-3 text-base focus:border-blue-500 focus:ring-blue-500"
                             required
                         >
-                        <p id="customer_email_help" class="mt-1 text-sm leading-5 text-gray-600">Enter an address where we can contact you, for example name@example.com.</p>
                         <x-input-error :messages="$errors->get('customer_email')" class="mt-2 text-sm" />
                     </div>
 
@@ -252,11 +248,9 @@
                             max="120"
                             placeholder="Enter your age"
                             inputmode="numeric"
-                            aria-describedby="age_help"
                             class="min-h-12 w-full rounded-lg border-gray-300 px-3 text-base focus:border-blue-500 focus:ring-blue-500"
                             required
                         >
-                        <p id="age_help" class="mt-1 text-sm leading-5 text-gray-600">Enter a whole number from 1 to 120.</p>
                         <x-input-error :messages="$errors->get('age')" class="mt-2 text-sm" />
                     </div>
 
@@ -277,7 +271,6 @@
                             required
                         >{{ old('description') }}</textarea>
 
-                        <p class="mt-1 text-sm leading-5 text-gray-600">Share what happened and what would make the experience better. Up to 5,000 characters.</p>
                         <x-input-error :messages="$errors->get('description')" class="mt-2 text-sm" />
                     </div>
 
