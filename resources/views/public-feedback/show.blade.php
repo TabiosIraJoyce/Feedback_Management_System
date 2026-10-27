@@ -170,7 +170,7 @@
                     <div id="feedback-customer-name">
                         <label for="customer_name" class="mb-1 block text-base font-medium text-gray-800">
                             Name
-                            <span class="text-red-600">(Required)</span>
+                            <span class="ml-0.5 font-semibold text-red-600" aria-hidden="true">*</span><span class="sr-only"> (required)</span>
                         </label>
 
                         <input
@@ -191,7 +191,7 @@
                     <div id="feedback-customer-phone">
                         <label for="customer_phone" class="mb-1 block text-base font-medium text-gray-800">
                             Contact Number
-                            <span class="text-red-600">(Required)</span>
+                            <span class="ml-0.5 font-semibold text-red-600" aria-hidden="true">*</span><span class="sr-only"> (required)</span>
                         </label>
 
                         <input
@@ -217,7 +217,7 @@
                     <div id="feedback-customer-email">
                         <label for="customer_email" class="mb-1 block text-base font-medium text-gray-800">
                             Email
-                            <span class="text-red-600">(Required)</span>
+                            <span class="ml-0.5 font-semibold text-red-600" aria-hidden="true">*</span><span class="sr-only"> (required)</span>
                         </label>
 
                         <input
@@ -240,7 +240,7 @@
                     <div id="feedback-age">
                         <label for="age" class="mb-1 block text-base font-medium text-gray-800">
                             Age
-                            <span class="text-red-600">(Required)</span>
+                            <span class="ml-0.5 font-semibold text-red-600" aria-hidden="true">*</span><span class="sr-only"> (required)</span>
                         </label>
 
                         <input
@@ -264,7 +264,7 @@
                     <div id="feedback-description" class="mt-1">
                         <label for="description" class="mb-1 block text-base font-medium text-gray-800">
                             Description
-                            <span class="text-red-600">(Required)</span>
+                            <span class="ml-0.5 font-semibold text-red-600" aria-hidden="true">*</span><span class="sr-only"> (required)</span>
                         </label>
 
                         <textarea
@@ -289,7 +289,7 @@
 
                     <h2 class="mb-2 text-center text-xl font-semibold text-gray-900">
                         Overall experience
-                        <span class="text-sm font-normal text-red-600">(Required)</span>
+                        <span class="ml-0.5 font-semibold text-red-600" aria-hidden="true">*</span><span class="sr-only"> (required)</span>
                     </h2>
 
                     <p class="mb-4 text-center text-sm leading-6 text-gray-600">Choose whether your experience was positive or needs improvement.</p>
@@ -365,7 +365,7 @@
 
                     <h2 class="text-xl font-semibold text-gray-900">
                         Satisfaction rating
-                        <span class="text-sm font-normal text-red-600">(Required)</span>
+                        <span class="ml-0.5 font-semibold text-red-600" aria-hidden="true">*</span><span class="sr-only"> (required)</span>
                     </h2>
 
                     <p class="mx-auto mb-4 mt-1 max-w-md text-sm leading-6 text-gray-600">
