@@ -50,9 +50,9 @@
 
         <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-6">
             <template x-for="card in statCards()" :key="card.label">
-                <article class="min-h-32 rounded-3xl border border-slate-700/80 bg-slate-900/90 p-5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-slate-600 hover:bg-slate-900 sm:p-6">
-                    <p class="text-xs font-medium uppercase tracking-[0.12em] text-blue-400 sm:text-sm" x-text="card.label"></p>
-                    <p class="mt-4 text-3xl font-semibold tracking-tight text-slate-50 sm:text-4xl" x-text="card.value"></p>
+                <article class="min-h-32 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50 sm:p-6">
+                    <p class="text-xs font-medium uppercase tracking-[0.12em] text-blue-600 sm:text-sm" x-text="card.label"></p>
+                    <p class="mt-4 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl" x-text="card.value"></p>
                 </article>
             </template>
         </div>
