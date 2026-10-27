@@ -1,12 +1,12 @@
 <x-app-layout>
     <x-slot name="header">
         <x-admin.page-header title="Feedback Center" description="Capture internal suggestions and customer feedback with visibility based on role." icon="messages-square">
-            @can('submit feedback')
+            @canany(['submit feedback', 'manage feedback'])
                 <a href="{{ route('feedback.create') }}" class="inline-flex items-center gap-2 rounded-2xl bg-cyan-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-cyan-700">
                     <i data-lucide="plus" class="h-4 w-4"></i>
                     New Feedback
                 </a>
-            @endcan
+            @endcanany
         </x-admin.page-header>
     </x-slot>
 

@@ -42,27 +42,11 @@ class QrManagementController extends Controller
             ->orderBy('code')
             ->paginate(12);
 
-        $scanTrendRows = \App\Models\QrCodeScan::query()
-            ->where('scanned_at', '>=', now()->subDays(6)->startOfDay())
-            ->selectRaw('DATE(scanned_at) as date, COUNT(*) as total')
-            ->groupBy('date')
-            ->orderBy('date')
-            ->get();
-
         return view('admin.qr.index', [
             'qrCodes' => $qrCodes,
             'branchOptions' => Branch::orderBy('name')->get(['id', 'name']),
             'type' => $type,
             'status' => $status,
-            'stats' => [
-                'total' => QrCode::count(),
-                'active' => QrCode::where('status', 'active')->count(),
-                'scans' => QrCode::sum('scan_count'),
-                'downloads' => QrCode::sum('download_count'),
-                'today_scans' => \App\Models\QrCodeScan::whereDate('scanned_at', today())->count(),
-            ],
-            'trend' => $this->qrCodes->scanTrend($scanTrendRows),
-            'topScanned' => QrCode::with(['branch', 'department'])->orderByDesc('scan_count')->limit(5)->get(),
         ]);
     }
 

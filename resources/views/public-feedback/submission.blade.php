@@ -167,6 +167,18 @@
 
                             </div>
 
+                            <div>
+
+                                <p class="text-xs text-slate-500">
+                                    Age
+                                </p>
+
+                                <p class="mt-1 text-sm">
+                                    {{ $ticket->customer_age ?? 'Not provided' }}
+                                </p>
+
+                            </div>
+
                         </div>
 
                     </div>

@@ -307,6 +307,9 @@ class PublicFeedbackController extends Controller
             'customer_phone' =>
                 $customerPhone,
 
+            'customer_age' =>
+                $validated['age'],
+
             'photos' =>
                 $photos,
 

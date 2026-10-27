@@ -43,9 +43,11 @@
         </a>
         <div id="global-live-region" aria-live="polite" aria-atomic="true" class="sr-only"></div>
 
-        <div class="fixed right-4 top-4 z-[75]">
-            <x-language-switcher compact />
-        </div>
+        @unless (request()->routeIs('feedback.public.show'))
+            <div class="fixed right-4 top-4 z-[75]">
+                <x-language-switcher compact />
+            </div>
+        @endunless
 
         @if (request()->routeIs('track-complaint.*') || request()->routeIs('feedback.public.*'))
             <main id="main-content">
@@ -65,6 +67,8 @@
             </div>
         @endif
 
-        @include('layouts.partials.hci-toolbar')
+        @unless (request()->routeIs('feedback.public.show'))
+            @include('layouts.partials.hci-toolbar')
+        @endunless
     </body>
 </html>

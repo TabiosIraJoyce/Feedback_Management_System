@@ -1,12 +1,12 @@
 <x-app-layout>
     <x-slot name="header">
         <x-admin.page-header title="Complaint Management" description="Track, assign, close, and review complaints by role and branch scope." icon="badge-alert">
-            @can('submit complaints')
+            @canany(['submit complaints', 'manage complaints'])
                 <a href="{{ route('complaints.create') }}" class="inline-flex items-center gap-2 rounded-2xl bg-cyan-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-cyan-700">
                     <i data-lucide="plus" class="h-4 w-4"></i>
                     New Complaint
                 </a>
-            @endcan
+            @endcanany
         </x-admin.page-header>
     </x-slot>
 

@@ -263,17 +263,6 @@
 
                         {{-- Business Types removed --}}
 
-
-                        {{-- Products --}}
-                        <x-admin.sidebar-link
-                            :href="route('products.index')"
-                            :active="request()->routeIs('products.*')"
-                            icon="box"
-                        >
-                            {{ __('Products') }}
-                        </x-admin.sidebar-link>
-
-
                         {{-- Original Departments module removed from menu --}}
 
                     </div>
@@ -395,23 +384,6 @@
                         </x-admin.sidebar-link>
 
                     @endif
-
-
-                    {{-- Form Builder --}}
-                    @if (
-                        auth()->user()->can('manage forms')
-                    )
-
-                        <x-admin.sidebar-link
-                            :href="route('admin.forms.index')"
-                            :active="request()->routeIs('admin.forms.*')"
-                            icon="layout-grid"
-                        >
-                            {{ __('Form Builder') }}
-                        </x-admin.sidebar-link>
-
-                    @endif
-
 
                     {{-- Profile --}}
                     <x-admin.sidebar-link

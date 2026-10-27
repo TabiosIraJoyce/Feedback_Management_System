@@ -26,6 +26,7 @@ class FeedbackTicket extends Model
         'customer_name',
         'customer_email',
         'customer_phone',
+        'customer_age',
         'photos',
         'status',
         'is_anonymous',

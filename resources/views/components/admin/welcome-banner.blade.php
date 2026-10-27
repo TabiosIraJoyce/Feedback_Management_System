@@ -24,10 +24,5 @@
             <h2 class="text-2xl font-extrabold leading-tight text-slate-900">{{ $greeting }}, {{ explode(' ', $user->name)[0] }}! <span class="ml-2">{{ $emoji }}</span></h2>
             <p class="mt-1 text-sm text-secondary-text">{{ __("Here's the latest summary of complaints and feedback across your branches.") }}</p>
         </div>
-
-        <div class="ml-auto space-y-2 text-right">
-            <button class="inline-flex items-center gap-2 rounded-full bg-purple-button px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-purple-hover dark:bg-purple-button/90 dark:hover:bg-purple-hover/90">{{ __('Create Complaint') }}</button>
-            <button class="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-4 py-2 text-sm font-medium text-primary-text transition hover:brightness-105">{{ __('Export') }}</button>
-        </div>
     </div>
 </div>

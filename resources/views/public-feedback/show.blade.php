@@ -1,4 +1,4 @@
-<x-app-layout>
+<x-guest-layout>
 
     <div class="min-h-screen bg-gray-50 py-8">
 
@@ -121,10 +121,24 @@
                 x-data="{
                     showConfirm: false,
                     showSuccess: {{ session()->has('feedback_success') ? 'true' : 'false' }},
-                    success: @json(session('feedback_success') ?? null)
+                    success: @json(session('feedback_success') ?? null),
+                    satisfaction: @js(old('satisfaction', '')),
+                    rating: {{ (int) old('rating', 0) }},
+                    showSatisfactionError: false,
+                    showRatingError: false,
+                    validateAndConfirm() {
+                        this.showSatisfactionError = ! this.$refs.satisfactionInput.value;
+                        this.showRatingError = Number(this.$refs.ratingInput.value) < 1;
+
+                        if (this.showSatisfactionError || this.showRatingError) {
+                            return;
+                        }
+
+                        this.showConfirm = true;
+                    }
                 }"
                 x-ref="feedbackForm"
-                @submit.prevent="showConfirm = true"
+                @submit.prevent="validateAndConfirm()"
             >
 
                 @csrf
@@ -142,7 +156,7 @@
                     <div class="mb-4">
                         <label class="block text-sm font-medium text-gray-700 mb-1">
                             Name
-                            <span class="text-gray-400">(Optional)</span>
+                            <span class="text-red-600">(Required)</span>
                         </label>
 
                         <input
@@ -152,7 +166,9 @@
                             placeholder="Enter your name"
                             class="w-full rounded-lg border-gray-300
                                    focus:border-blue-500 focus:ring-blue-500"
+                            required
                         >
+                        <x-input-error :messages="$errors->get('customer_name')" class="mt-2" />
                     </div>
 
 
@@ -160,7 +176,7 @@
                     <div class="mb-4">
                         <label class="block text-sm font-medium text-gray-700 mb-1">
                             Contact Number
-                            <span class="text-gray-400">(Optional)</span>
+                            <span class="text-red-600">(Required)</span>
                         </label>
 
                         <input
@@ -170,7 +186,9 @@
                             placeholder="09XXXXXXXXX"
                             class="w-full rounded-lg border-gray-300
                                    focus:border-blue-500 focus:ring-blue-500"
+                            required
                         >
+                        <x-input-error :messages="$errors->get('customer_phone')" class="mt-2" />
                     </div>
 
 
@@ -178,7 +196,7 @@
                     <div class="mb-4">
                         <label class="block text-sm font-medium text-gray-700 mb-1">
                             Email
-                            <span class="text-gray-400">(Optional)</span>
+                            <span class="text-red-600">(Required)</span>
                         </label>
 
                         <input
@@ -188,7 +206,9 @@
                             placeholder="example@email.com"
                             class="w-full rounded-lg border-gray-300
                                    focus:border-blue-500 focus:ring-blue-500"
+                            required
                         >
+                        <x-input-error :messages="$errors->get('customer_email')" class="mt-2" />
                     </div>
 
 
@@ -196,7 +216,7 @@
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">
                             Age
-                            <span class="text-gray-400">(Optional)</span>
+                            <span class="text-red-600">(Required)</span>
                         </label>
 
                         <input
@@ -208,14 +228,16 @@
                             placeholder="Enter your age"
                             class="w-full rounded-lg border-gray-300
                                    focus:border-blue-500 focus:ring-blue-500"
+                            required
                         >
+                        <x-input-error :messages="$errors->get('age')" class="mt-2" />
                     </div>
 
                     {{-- Description --}}
                     <div class="mt-4">
                         <label class="block text-sm font-medium text-gray-700 mb-1">
                             Description
-                            <span class="text-gray-400">(Optional)</span>
+                            <span class="text-red-600">(Required)</span>
                         </label>
 
                         <textarea
@@ -223,6 +245,7 @@
                             rows="4"
                             placeholder="Tell us a bit about your experience"
                             class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                            required
                         >{{ old('description') }}</textarea>
 
                         <x-input-error :messages="$errors->get('description')" class="mt-2" />
@@ -234,11 +257,11 @@
                 {{-- Thumbs --}}
                 <div
                     class="mb-8"
-                    x-data="{ satisfaction: '{{ old('satisfaction') }}' }"
                 >
 
                     <h2 class="text-lg font-semibold text-gray-900 text-center mb-4">
                         How was your experience?
+                        <span class="text-sm font-normal text-red-600">(Required)</span>
                     </h2>
 
                     <div class="flex justify-center gap-5">
@@ -246,7 +269,7 @@
                         {{-- Thumbs Up --}}
                         <button
                             type="button"
-                            @click="satisfaction = 'like'"
+                            @click="satisfaction = 'like'; showSatisfactionError = false"
                             :class="satisfaction === 'like'
                                 ? 'border-green-500 bg-green-50'
                                 : 'border-gray-200 bg-white'"
@@ -265,7 +288,7 @@
                         {{-- Thumbs Down --}}
                         <button
                             type="button"
-                            @click="satisfaction = 'dislike'"
+                            @click="satisfaction = 'dislike'; showSatisfactionError = false"
                             :class="satisfaction === 'dislike'
                                 ? 'border-red-500 bg-red-50'
                                 : 'border-gray-200 bg-white'"
@@ -286,12 +309,16 @@
                         type="hidden"
                         name="satisfaction"
                         :value="satisfaction"
+                        x-ref="satisfactionInput"
                     >
 
                     <x-input-error
                         :messages="$errors->get('satisfaction')"
                         class="mt-3 text-center"
                     />
+                    <p x-show="showSatisfactionError" class="mt-2 text-center text-sm text-red-600" role="alert">
+                        Please choose Good or Not Good.
+                    </p>
 
                 </div>
 
@@ -299,11 +326,11 @@
                 {{-- Star Rating --}}
                 <div
                     class="mb-8 text-center"
-                    x-data="{ rating: {{ old('rating', 0) }} }"
                 >
 
                     <h2 class="text-lg font-semibold text-gray-900">
                         Satisfaction Rating
+                        <span class="text-sm font-normal text-red-600">(Required)</span>
                     </h2>
 
                     <p class="text-sm text-gray-500 mt-1 mb-4">
@@ -311,19 +338,26 @@
                     </p>
 
 
-                    <div class="flex justify-center gap-2">
+                    @php($ratingLabels = [1 => 'Very Poor', 2 => 'Poor', 3 => 'Fair', 4 => 'Good', 5 => 'Excellent'])
+                    <div class="mx-auto grid max-w-sm grid-cols-5 gap-1">
 
                         @for($i = 1; $i <= 5; $i++)
+                            @php($ratingLabel = $ratingLabels[$i])
 
                             <button
                                 type="button"
-                                @click="rating = {{ $i }}"
-                                class="text-4xl leading-none transition"
+                                @click="rating = {{ $i }}; showRatingError = false"
+                                aria-label="{{ $i }} {{ $i === 1 ? 'star' : 'stars' }}: {{ $ratingLabel }}"
+                                title="{{ $i }} {{ $i === 1 ? 'star' : 'stars' }}: {{ $ratingLabel }}"
+                                :aria-pressed="rating === {{ $i }}"
+                                class="flex min-w-0 flex-col items-center rounded-lg px-1 py-2 transition hover:bg-yellow-50 focus:outline-none focus:ring-2 focus:ring-yellow-400"
                                 :class="rating >= {{ $i }}
                                     ? 'text-yellow-400'
                                     : 'text-gray-300'"
                             >
-                                ★
+                                <span class="text-3xl leading-none">★</span>
+                                <span class="mt-1 text-[10px] leading-tight text-gray-600">{{ $i }} {{ $i === 1 ? 'Star' : 'Stars' }}</span>
+                                <span class="text-[10px] leading-tight text-gray-500">{{ $ratingLabel }}</span>
                             </button>
 
                         @endfor
@@ -343,7 +377,12 @@
                         type="hidden"
                         name="rating"
                         x-model="rating"
+                        x-ref="ratingInput"
                     >
+                    <x-input-error :messages="$errors->get('rating')" class="mt-2" />
+                    <p x-show="showRatingError" class="mt-2 text-sm text-red-600" role="alert">
+                        Please select a star rating.
+                    </p>
 
                 </div>
 
@@ -353,8 +392,8 @@
 
                     <h2 class="text-lg font-semibold text-gray-900 mb-1">
                         Photo
-                        <span class="text-sm font-normal text-gray-400">
-                            (Optional)
+                        <span class="text-sm font-normal text-red-600">
+                            (Required)
                         </span>
                     </h2>
 
@@ -387,10 +426,14 @@
                             name="photos[]"
                             accept="image/*"
                             capture="environment"
-                            class="hidden"
+                            class="sr-only"
+                            x-ref="photoInput"
+                            required
                         >
 
                     </label>
+                    <x-input-error :messages="$errors->get('photos')" class="mt-2" />
+                    <x-input-error :messages="$errors->get('photos.0')" class="mt-2" />
 
                 </div>
 
@@ -532,4 +575,4 @@
 
     </div>
 
-</x-app-layout>
+</x-guest-layout>
