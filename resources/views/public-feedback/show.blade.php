@@ -361,11 +361,6 @@
                         <span class="ml-0.5 font-semibold text-red-600" aria-hidden="true">*</span><span class="sr-only"> (required)</span>
                     </h2>
 
-                    <p class="mx-auto mb-4 mt-1 max-w-md text-sm leading-6 text-gray-600">
-                        Choose one score to show how satisfied you were: 1 is Very Poor and 5 is Excellent.
-                    </p>
-
-
                     @php($ratingLabels = [1 => 'Very Poor', 2 => 'Poor', 3 => 'Fair', 4 => 'Good', 5 => 'Excellent'])
                     <div class="mx-auto grid max-w-md grid-cols-5 gap-2">
 
@@ -394,10 +389,9 @@
 
 
                     <p
+                        x-show="rating > 0"
                         class="text-sm text-gray-500 mt-2"
-                        x-text="rating > 0
-                            ? rating + ' out of 5'
-                            : 'Please select a rating'"
+                        x-text="rating + ' out of 5'"
                     ></p>
 
 
