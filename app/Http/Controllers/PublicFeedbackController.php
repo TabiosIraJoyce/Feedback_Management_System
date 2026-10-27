@@ -166,7 +166,9 @@ class PublicFeedbackController extends Controller
             $request->all(),
             $formRequest->rules(),
             $formRequest->messages(),
-        )->validate();
+        )
+            ->setAttributeNames($formRequest->attributes())
+            ->validate();
 
 
         /*

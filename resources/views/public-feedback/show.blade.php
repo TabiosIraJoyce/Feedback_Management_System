@@ -1,11 +1,11 @@
 <x-guest-layout>
 
-    <div class="min-h-screen bg-gray-50 py-8">
+    <div class="min-h-screen bg-gray-50 py-6 sm:py-8">
 
-        <div class="max-w-lg mx-auto px-4">
+        <div class="mx-auto max-w-xl px-4 sm:px-6">
 
             {{-- Header --}}
-            <div class="text-center mb-8">
+            <div class="mb-6 text-center sm:mb-8">
 
                 <img
                     src="{{ asset('images/feedback-logo.png') }}"
@@ -31,7 +31,7 @@
 
 
             {{-- Success Message --}}
-            @if(session('status'))
+            @if(session('status') && ! session()->has('feedback_success'))
                 <div class="mb-6 rounded-xl bg-green-50 border border-green-200
                             px-4 py-3 text-sm text-green-700">
                     {{ session('status') }}
@@ -82,7 +82,7 @@
                         }
                     })()">
 
-                <div class="bg-white rounded-xl border p-4 mb-3">
+                <div x-show="error || matches" x-cloak class="mb-3 rounded-xl border bg-white p-4">
                     <template x-if="error">
                         <p class="text-sm text-gray-500" x-text="error"></p>
                     </template>
@@ -117,7 +117,7 @@
                 ]) }}"
                 method="POST"
                 enctype="multipart/form-data"
-                class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6"
+                class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6"
                 x-data="{
                     showConfirm: false,
                     showSuccess: {{ session()->has('feedback_success') ? 'true' : 'false' }},
@@ -126,7 +126,10 @@
                     rating: {{ (int) old('rating', 0) }},
                     showSatisfactionError: false,
                     showRatingError: false,
+                    photoName: '',
                     validateAndConfirm() {
+                        if (! this.$refs.feedbackForm.reportValidity()) return;
+
                         this.showSatisfactionError = ! this.$refs.satisfactionInput.value;
                         this.showRatingError = Number(this.$refs.ratingInput.value) < 1;
 
@@ -143,126 +146,153 @@
 
                 @csrf
 
+                @if ($errors->any())
+                    <div class="mb-6 rounded-xl border border-red-300 bg-red-50 p-4 text-red-900" role="alert" aria-labelledby="feedback-error-title">
+                        <h2 id="feedback-error-title" class="text-base font-semibold">Please review your answers</h2>
+                        <ul class="mt-2 list-inside list-disc space-y-1 text-sm leading-6">
+                            @foreach ($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+
 
                 {{-- Personal Information --}}
-                <div class="mb-8">
+                <div class="mb-8 space-y-5">
 
-                    <h2 class="text-lg font-semibold text-gray-900 mb-4">
+                    <h2 class="text-xl font-semibold text-gray-900">
                         Your Information
                     </h2>
 
 
                     {{-- Name --}}
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                    <div id="feedback-customer-name">
+                        <label for="customer_name" class="mb-1 block text-base font-medium text-gray-800">
                             Name
                             <span class="text-red-600">(Required)</span>
                         </label>
 
                         <input
                             type="text"
+                            id="customer_name"
                             name="customer_name"
                             value="{{ old('customer_name') }}"
                             placeholder="Enter your name"
-                            class="w-full rounded-lg border-gray-300
-                                   focus:border-blue-500 focus:ring-blue-500"
+                            autocomplete="name"
+                            class="min-h-12 w-full rounded-lg border-gray-300 px-3 text-base focus:border-blue-500 focus:ring-blue-500"
                             required
                         >
-                        <x-input-error :messages="$errors->get('customer_name')" class="mt-2" />
+                        <x-input-error :messages="$errors->get('customer_name')" class="mt-2 text-sm" />
                     </div>
 
 
                     {{-- Contact Number --}}
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                    <div id="feedback-customer-phone">
+                        <label for="customer_phone" class="mb-1 block text-base font-medium text-gray-800">
                             Contact Number
                             <span class="text-red-600">(Required)</span>
                         </label>
 
                         <input
                             type="tel"
+                            id="customer_phone"
                             name="customer_phone"
                             value="{{ old('customer_phone') }}"
-                            placeholder="09XXXXXXXXX"
-                            class="w-full rounded-lg border-gray-300
-                                   focus:border-blue-500 focus:ring-blue-500"
+                            placeholder="09XXXXXXXXX or +63 9XX XXX XXXX"
+                            inputmode="tel"
+                            autocomplete="tel"
+                            pattern="(?=(?:\D*\d){7})[0-9+().\s-]{7,20}"
+                            title="Enter at least 7 digits. You may include +, spaces, parentheses, dots, or hyphens."
+                            aria-describedby="customer_phone_help"
+                            class="min-h-12 w-full rounded-lg border-gray-300 px-3 text-base focus:border-blue-500 focus:ring-blue-500"
                             required
                         >
-                        <x-input-error :messages="$errors->get('customer_phone')" class="mt-2" />
+                        <p id="customer_phone_help" class="mt-1 text-sm leading-5 text-gray-600">Enter at least 7 digits. Spaces, +, parentheses, dots, and hyphens are okay.</p>
+                        <x-input-error :messages="$errors->get('customer_phone')" class="mt-2 text-sm" />
                     </div>
 
 
                     {{-- Email --}}
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                    <div id="feedback-customer-email">
+                        <label for="customer_email" class="mb-1 block text-base font-medium text-gray-800">
                             Email
                             <span class="text-red-600">(Required)</span>
                         </label>
 
                         <input
                             type="email"
+                            id="customer_email"
                             name="customer_email"
                             value="{{ old('customer_email') }}"
                             placeholder="example@email.com"
-                            class="w-full rounded-lg border-gray-300
-                                   focus:border-blue-500 focus:ring-blue-500"
+                            autocomplete="email"
+                            aria-describedby="customer_email_help"
+                            class="min-h-12 w-full rounded-lg border-gray-300 px-3 text-base focus:border-blue-500 focus:ring-blue-500"
                             required
                         >
-                        <x-input-error :messages="$errors->get('customer_email')" class="mt-2" />
+                        <p id="customer_email_help" class="mt-1 text-sm leading-5 text-gray-600">Enter an address where we can contact you, for example name@example.com.</p>
+                        <x-input-error :messages="$errors->get('customer_email')" class="mt-2 text-sm" />
                     </div>
 
 
                     {{-- Age --}}
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                    <div id="feedback-age">
+                        <label for="age" class="mb-1 block text-base font-medium text-gray-800">
                             Age
                             <span class="text-red-600">(Required)</span>
                         </label>
 
                         <input
                             type="number"
+                            id="age"
                             name="age"
                             value="{{ old('age') }}"
                             min="1"
                             max="120"
                             placeholder="Enter your age"
-                            class="w-full rounded-lg border-gray-300
-                                   focus:border-blue-500 focus:ring-blue-500"
+                            inputmode="numeric"
+                            aria-describedby="age_help"
+                            class="min-h-12 w-full rounded-lg border-gray-300 px-3 text-base focus:border-blue-500 focus:ring-blue-500"
                             required
                         >
-                        <x-input-error :messages="$errors->get('age')" class="mt-2" />
+                        <p id="age_help" class="mt-1 text-sm leading-5 text-gray-600">Enter a whole number from 1 to 120.</p>
+                        <x-input-error :messages="$errors->get('age')" class="mt-2 text-sm" />
                     </div>
 
                     {{-- Description --}}
-                    <div class="mt-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                    <div id="feedback-description" class="mt-1">
+                        <label for="description" class="mb-1 block text-base font-medium text-gray-800">
                             Description
                             <span class="text-red-600">(Required)</span>
                         </label>
 
                         <textarea
+                            id="description"
                             name="description"
                             rows="4"
                             placeholder="Tell us a bit about your experience"
-                            class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                            maxlength="5000"
+                            class="w-full rounded-lg border-gray-300 px-3 py-2 text-base leading-6 focus:border-blue-500 focus:ring-blue-500"
                             required
                         >{{ old('description') }}</textarea>
 
-                        <x-input-error :messages="$errors->get('description')" class="mt-2" />
+                        <p class="mt-1 text-sm leading-5 text-gray-600">Share what happened and what would make the experience better. Up to 5,000 characters.</p>
+                        <x-input-error :messages="$errors->get('description')" class="mt-2 text-sm" />
                     </div>
 
                 </div>
 
 
                 {{-- Thumbs --}}
-                <div
-                    class="mb-8"
-                >
+                <div id="feedback-satisfaction" class="mb-8">
 
-                    <h2 class="text-lg font-semibold text-gray-900 text-center mb-4">
-                        How was your experience?
+                    <h2 class="mb-2 text-center text-xl font-semibold text-gray-900">
+                        Overall experience
                         <span class="text-sm font-normal text-red-600">(Required)</span>
                     </h2>
+
+                    <p class="mb-4 text-center text-sm leading-6 text-gray-600">Choose whether your experience was positive or needs improvement.</p>
 
                     <div class="flex justify-center gap-5">
 
@@ -270,16 +300,18 @@
                         <button
                             type="button"
                             @click="satisfaction = 'like'; showSatisfactionError = false"
+                            :aria-pressed="satisfaction === 'like'"
+                            aria-label="Positive experience"
                             :class="satisfaction === 'like'
                                 ? 'border-green-500 bg-green-50'
                                 : 'border-gray-200 bg-white'"
-                            class="w-28 h-24 rounded-xl border-2
+                            class="min-h-24 w-28 rounded-xl border-2 sm:w-32
                                    flex flex-col items-center justify-center
-                                   transition"
+                                   text-base transition focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
                             <span class="text-4xl">👍</span>
 
-                            <span class="text-sm font-medium text-gray-600 mt-1">
+                            <span class="mt-1 text-base font-medium text-gray-700">
                                 Good
                             </span>
                         </button>
@@ -289,17 +321,19 @@
                         <button
                             type="button"
                             @click="satisfaction = 'dislike'; showSatisfactionError = false"
+                            :aria-pressed="satisfaction === 'dislike'"
+                            aria-label="Experience needs improvement"
                             :class="satisfaction === 'dislike'
                                 ? 'border-red-500 bg-red-50'
                                 : 'border-gray-200 bg-white'"
-                            class="w-28 h-24 rounded-xl border-2
+                            class="min-h-24 w-28 rounded-xl border-2 sm:w-32
                                    flex flex-col items-center justify-center
-                                   transition"
+                                   text-base transition focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
                             <span class="text-4xl">👎</span>
 
-                            <span class="text-sm font-medium text-gray-600 mt-1">
-                                Not Good
+                            <span class="mt-1 text-base font-medium text-gray-700">
+                                Needs improvement
                             </span>
                         </button>
 
@@ -317,7 +351,7 @@
                         class="mt-3 text-center"
                     />
                     <p x-show="showSatisfactionError" class="mt-2 text-center text-sm text-red-600" role="alert">
-                        Please choose Good or Not Good.
+                        Choose Good or Needs improvement to describe your overall experience.
                     </p>
 
                 </div>
@@ -325,21 +359,22 @@
 
                 {{-- Star Rating --}}
                 <div
+                    id="feedback-rating"
                     class="mb-8 text-center"
                 >
 
-                    <h2 class="text-lg font-semibold text-gray-900">
-                        Satisfaction Rating
+                    <h2 class="text-xl font-semibold text-gray-900">
+                        Satisfaction rating
                         <span class="text-sm font-normal text-red-600">(Required)</span>
                     </h2>
 
-                    <p class="text-sm text-gray-500 mt-1 mb-4">
-                        Rate your experience from 1 to 5 stars.
+                    <p class="mx-auto mb-4 mt-1 max-w-md text-sm leading-6 text-gray-600">
+                        Choose one score to show how satisfied you were: 1 is Very Poor and 5 is Excellent.
                     </p>
 
 
                     @php($ratingLabels = [1 => 'Very Poor', 2 => 'Poor', 3 => 'Fair', 4 => 'Good', 5 => 'Excellent'])
-                    <div class="mx-auto grid max-w-sm grid-cols-5 gap-1">
+                    <div class="mx-auto grid max-w-md grid-cols-5 gap-2">
 
                         @for($i = 1; $i <= 5; $i++)
                             @php($ratingLabel = $ratingLabels[$i])
@@ -350,14 +385,14 @@
                                 aria-label="{{ $i }} {{ $i === 1 ? 'star' : 'stars' }}: {{ $ratingLabel }}"
                                 title="{{ $i }} {{ $i === 1 ? 'star' : 'stars' }}: {{ $ratingLabel }}"
                                 :aria-pressed="rating === {{ $i }}"
-                                class="flex min-w-0 flex-col items-center rounded-lg px-1 py-2 transition hover:bg-yellow-50 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                                class="flex min-h-24 min-w-0 flex-col items-center justify-center rounded-lg px-1 py-2 transition hover:bg-yellow-50 focus:outline-none focus:ring-2 focus:ring-yellow-400"
                                 :class="rating >= {{ $i }}
                                     ? 'text-yellow-400'
                                     : 'text-gray-300'"
                             >
                                 <span class="text-3xl leading-none">★</span>
-                                <span class="mt-1 text-[10px] leading-tight text-gray-600">{{ $i }} {{ $i === 1 ? 'Star' : 'Stars' }}</span>
-                                <span class="text-[10px] leading-tight text-gray-500">{{ $ratingLabel }}</span>
+                                <span class="mt-2 text-sm leading-5 text-gray-700">{{ $i }} {{ $i === 1 ? 'Star' : 'Stars' }}</span>
+                                <span class="text-sm leading-5 text-gray-600">{{ $ratingLabel }}</span>
                             </button>
 
                         @endfor
@@ -388,23 +423,23 @@
 
 
                 {{-- Photo --}}
-                <div class="mb-8">
+                <div id="feedback-photo" class="mb-8">
 
                     <h2 class="text-lg font-semibold text-gray-900 mb-1">
                         Photo
-                        <span class="text-sm font-normal text-red-600">
-                            (Required)
+                        <span class="text-sm font-normal text-gray-600">
+                            (Optional)
                         </span>
                     </h2>
 
-                    <p class="text-sm text-gray-500 mb-3">
-                        Upload a photo or take a photo using your camera.
+                    <p class="mb-3 text-sm leading-6 text-gray-600">
+                        A photo can help explain your feedback, but you can submit without one. JPG, PNG, or WEBP up to 4 MB.
                     </p>
 
 
                     <label
                         class="flex flex-col items-center justify-center
-                               w-full h-32 rounded-xl border-2 border-dashed
+                               min-h-36 w-full rounded-xl border-2 border-dashed p-4
                                border-gray-300 cursor-pointer
                                hover:bg-gray-50 transition"
                     >
@@ -413,22 +448,20 @@
                             📷
                         </span>
 
-                        <span class="text-sm font-medium text-gray-600">
-                            Upload or Take Photo
+                        <span class="text-base font-medium text-gray-700">
+                            Choose a photo (optional)
                         </span>
 
-                        <span class="text-xs text-gray-400 mt-1">
-                            JPG, PNG, WEBP
+                        <span class="mt-1 text-sm text-gray-600" x-text="photoName || 'No photo selected'">
                         </span>
 
                         <input
                             type="file"
                             name="photos[]"
-                            accept="image/*"
+                            accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
                             capture="environment"
                             class="sr-only"
-                            x-ref="photoInput"
-                            required
+                            @change="photoName = $event.target.files[0]?.name || ''"
                         >
 
                     </label>
@@ -441,8 +474,8 @@
                 {{-- Submit --}}
                 <button
                     type="submit"
-                    class="w-full rounded-xl bg-blue-600
-                           px-4 py-3 text-white font-semibold
+                    class="min-h-14 w-full rounded-xl bg-blue-600
+                           px-4 py-3 text-base text-white font-semibold
                            hover:bg-blue-700 transition"
                 >
                     Submit Feedback
@@ -453,14 +486,17 @@
                     x-show="showConfirm"
                     x-cloak
                     class="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="feedback-confirm-title"
                 >
-                    <div class="w-full max-w-md bg-white rounded-lg p-6">
-                        <h3 class="text-lg font-semibold">Confirm submission</h3>
-                        <p class="mt-2 text-sm text-gray-600">Are you sure you want to submit this feedback? You can’t edit it afterwards.</p>
+                    <div class="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl sm:p-6">
+                        <h3 id="feedback-confirm-title" class="text-xl font-semibold text-gray-900">Confirm submission</h3>
+                        <p class="mt-2 text-base leading-6 text-gray-700">Ready to send your feedback? You will not be able to edit it after submission.</p>
 
-                        <div class="mt-4 flex justify-end gap-3">
-                            <button type="button" @click="showConfirm = false" class="rounded-lg px-4 py-2 border">Cancel</button>
-                            <button type="button" @click="$refs.feedbackForm.submit()" class="rounded-lg bg-blue-600 px-4 py-2 text-white">Yes, submit</button>
+                        <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                            <button type="button" @click="showConfirm = false" class="min-h-12 rounded-lg border border-gray-300 px-5 text-base font-medium text-gray-800">Go back</button>
+                            <button type="button" @click="$refs.feedbackForm.submit()" class="min-h-12 rounded-lg bg-blue-600 px-5 text-base font-semibold text-white hover:bg-blue-700">Submit feedback</button>
                         </div>
                     </div>
                 </div>
@@ -506,61 +542,26 @@
                     })();
                 </script>
 
-                {{-- Success Popup / Tracker (shows when redirected after submit) --}}
+                {{-- Clear submission confirmation --}}
                 <div
                     x-show="showSuccess"
                     x-cloak
-                    class="fixed inset-0 z-50 flex items-start justify-center p-6 pt-24"
+                    class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="feedback-success-title"
                 >
-                    <div class="w-full max-w-xl bg-white rounded-xl shadow-lg border p-6">
-                        <div class="flex items-start justify-between gap-4">
-                            <div>
-                                <h3 class="text-lg font-semibold">Feedback submitted</h3>
-                                <p class="mt-1 text-sm text-gray-600">Thank you! Your feedback was received.</p>
-                            </div>
+                    <div class="w-full max-w-lg rounded-2xl border border-green-200 bg-white p-6 shadow-xl sm:p-8">
+                        <div class="flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-3xl font-bold text-green-700" aria-hidden="true">✓</div>
+                        <h3 id="feedback-success-title" class="mt-4 text-2xl font-bold text-gray-900">Thank you. Your feedback was received.</h3>
+                        <p class="mt-2 text-base leading-6 text-gray-700">Your feedback has been submitted successfully. Keep this reference number if you want to follow up.</p>
 
-                            <div class="text-right">
-                                <button @click="showSuccess = false" class="text-sm text-gray-500">Close</button>
-                            </div>
+                        <div class="mt-5 rounded-xl bg-gray-50 p-4">
+                            <p class="text-sm font-medium text-gray-700">Reference number</p>
+                            <p class="mt-1 break-all text-xl font-bold tracking-wide text-cyan-800" x-text="success?.reference_no ?? 'Not available'"></p>
                         </div>
 
-                        <div class="mt-4 border-t pt-4">
-                            <p class="text-sm text-gray-700">Reference number:</p>
-                            <div class="mt-2 inline-flex items-center gap-3 rounded-md bg-slate-50 px-3 py-2 text-sm font-medium">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-cyan-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>
-                                <span class="text-cyan-700" x-text="success?.reference_no ?? '—'"></span>
-                            </div>
-
-                            {{-- Simple Tracker --}}
-                            <div class="mt-4">
-                                <div class="flex items-center gap-4">
-                                    <div class="flex-1">
-                                        <div class="flex items-center gap-3">
-                                            <div class="h-3 w-3 rounded-full bg-cyan-600"></div>
-                                            <div class="text-sm font-medium">Submitted</div>
-                                        </div>
-                                    </div>
-
-                                    <div class="flex-1">
-                                        <div class="flex items-center gap-3 opacity-40">
-                                            <div class="h-3 w-3 rounded-full bg-gray-300"></div>
-                                            <div class="text-sm">In progress</div>
-                                        </div>
-                                    </div>
-
-                                    <div class="flex-1">
-                                        <div class="flex items-center gap-3 opacity-40">
-                                            <div class="h-3 w-3 rounded-full bg-gray-300"></div>
-                                            <div class="text-sm">Resolved</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="mt-4 flex justify-end">
-                                <a href="#" class="text-sm text-cyan-600">View details</a>
-                            </div>
-                        </div>
+                        <button type="button" @click="showSuccess = false" class="mt-6 min-h-12 w-full rounded-xl bg-blue-600 px-5 text-base font-semibold text-white hover:bg-blue-700">Done</button>
                     </div>
                 </div>
 
