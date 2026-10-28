@@ -111,6 +111,45 @@
                 </div>
             </section>
         </div>
+
+        <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-labelledby="department-highlights-title">
+            <div class="mb-5">
+                <h2 id="department-highlights-title" class="text-lg font-semibold text-slate-950">{{ __('Department Highlights') }}</h2>
+                <p class="mt-1 text-sm text-slate-500">{{ __('Departments with the highest complaint volume and positive feedback.') }}</p>
+            </div>
+
+            <div class="grid gap-4 md:grid-cols-2">
+                <article class="flex items-start gap-4 rounded-xl border border-rose-100 bg-rose-50/60 p-4">
+                    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-rose-700 shadow-sm"><i data-lucide="message-circle-warning" class="h-5 w-5"></i></span>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-sm font-medium text-rose-800">{{ __('Most Complaints') }}</p>
+                        <p class="mt-1 truncate text-lg font-semibold text-slate-950" x-text="dashboard.analytics.department_highlights?.most_complaints?.name ?? '{{ __('No data yet') }}'"></p>
+                        <p class="mt-1 text-sm text-slate-600">
+                            <span x-text="dashboard.analytics.department_highlights?.most_complaints?.count ?? 0"></span>
+                            {{ __('complaints') }}
+                            <template x-if="dashboard.analytics.department_highlights?.most_complaints?.branch_name">
+                                <span>· <span x-text="dashboard.analytics.department_highlights.most_complaints.branch_name"></span></span>
+                            </template>
+                        </p>
+                    </div>
+                </article>
+
+                <article class="flex items-start gap-4 rounded-xl border border-teal-100 bg-teal-50/60 p-4">
+                    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-teal-700 shadow-sm"><i data-lucide="thumbs-up" class="h-5 w-5"></i></span>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-sm font-medium text-teal-800">{{ __('Most Positive Feedback') }}</p>
+                        <p class="mt-1 truncate text-lg font-semibold text-slate-950" x-text="dashboard.analytics.department_highlights?.most_positive_feedback?.name ?? '{{ __('No data yet') }}'"></p>
+                        <p class="mt-1 text-sm text-slate-600">
+                            <span x-text="dashboard.analytics.department_highlights?.most_positive_feedback?.count ?? 0"></span>
+                            {{ __('positive feedback entries') }}
+                            <template x-if="dashboard.analytics.department_highlights?.most_positive_feedback?.branch_name">
+                                <span>· <span x-text="dashboard.analytics.department_highlights.most_positive_feedback.branch_name"></span></span>
+                            </template>
+                        </p>
+                    </div>
+                </article>
+            </div>
+        </section>
     </div>
 
     <script>

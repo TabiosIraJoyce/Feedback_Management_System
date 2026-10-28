@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Branch;
 use App\Models\Complaint;
+use App\Models\Department;
 use App\Models\Feedback;
 use App\Models\FeedbackTicket;
 use App\Models\Product;
@@ -11,6 +12,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
@@ -76,6 +78,7 @@ class DashboardAnalyticsService
                 'status_distribution' => $statusDistribution,
                 'category' => $categoryAnalytics,
                 'feedback_distribution' => $this->buildFeedbackDistribution($filters, $user),
+                'department_highlights' => $this->buildDepartmentHighlights($filters, $user),
                 'branch_performance' => $branchPerformance,
                 'product' => $productAnalytics,
                 'sla' => $slaAnalytics,
@@ -139,7 +142,7 @@ class DashboardAnalyticsService
 
     private function buildCacheKey(array $filters, int|string $userId): string
     {
-        return 'dashboard_metrics_v2_'.md5($userId.'|'.json_encode($filters));
+        return 'dashboard_metrics_v3_'.md5($userId.'|'.json_encode($filters));
     }
 
     private function buildSummary(Builder $query, array $filters, Authenticatable $user): array
@@ -239,6 +242,49 @@ class DashboardAnalyticsService
             ])
             ->values()
             ->all();
+    }
+
+    private function buildDepartmentHighlights(array $filters, Authenticatable $user): array
+    {
+        $complaintCounts = $this->buildComplaintQuery($filters, $user)
+            ->whereNotNull('department_id')
+            ->select('department_id', DB::raw('COUNT(*) as total'))
+            ->groupBy('department_id')
+            ->pluck('total', 'department_id');
+
+        $positiveFeedbackCounts = $this->buildFeedbackQuery($filters, $user)
+            ->where('sentiment', 'positive')
+            ->whereNotNull('department_id')
+            ->select('department_id', DB::raw('COUNT(*) as total'))
+            ->groupBy('department_id')
+            ->pluck('total', 'department_id');
+
+        $departmentIds = $complaintCounts->keys()
+            ->merge($positiveFeedbackCounts->keys())
+            ->unique()
+            ->values();
+
+        $departments = Department::with('branch')
+            ->whereIn('id', $departmentIds)
+            ->get()
+            ->keyBy('id');
+
+        return [
+            'most_complaints' => $this->departmentHighlight($complaintCounts, $departments),
+            'most_positive_feedback' => $this->departmentHighlight($positiveFeedbackCounts, $departments),
+        ];
+    }
+
+    private function departmentHighlight(Collection $counts, Collection $departments): array
+    {
+        $departmentId = $counts->sortDesc()->keys()->first();
+        $department = $departmentId ? $departments->get($departmentId) : null;
+
+        return [
+            'name' => $department?->name ?? __('No data yet'),
+            'branch_name' => $department?->branch?->name,
+            'count' => (int) ($departmentId ? $counts->get($departmentId, 0) : 0),
+        ];
     }
 
     private function buildTrendData(array $filters, Authenticatable $user): array
