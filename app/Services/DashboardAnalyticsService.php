@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\Branch;
 use App\Models\Complaint;
+use App\Models\Feedback;
+use App\Models\FeedbackTicket;
 use App\Models\Product;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
@@ -55,7 +57,7 @@ class DashboardAnalyticsService
     {
         $query = $this->buildComplaintQuery($filters, $user);
 
-        $stats = $this->buildSummary($query);
+        $stats = $this->buildSummary($query, $filters, $user);
         $trend = $this->buildTrendData($filters, $user);
         $statusDistribution = $this->buildStatusDistribution($filters, $user);
         $categoryAnalytics = $this->buildCategoryAnalytics($filters, $user);
@@ -73,6 +75,7 @@ class DashboardAnalyticsService
                 'trend' => $trend,
                 'status_distribution' => $statusDistribution,
                 'category' => $categoryAnalytics,
+                'feedback_distribution' => $this->buildFeedbackDistribution($filters, $user),
                 'branch_performance' => $branchPerformance,
                 'product' => $productAnalytics,
                 'sla' => $slaAnalytics,
@@ -136,13 +139,14 @@ class DashboardAnalyticsService
 
     private function buildCacheKey(array $filters, int|string $userId): string
     {
-        return 'dashboard_metrics_'.md5($userId.'|'.json_encode($filters));
+        return 'dashboard_metrics_v2_'.md5($userId.'|'.json_encode($filters));
     }
 
-    private function buildSummary(Builder $query): array
+    private function buildSummary(Builder $query, array $filters, Authenticatable $user): array
     {
         $total = (clone $query)->count();
-        $pending = (clone $query)->whereIn('status', ['open', 'in_progress', 'reopened'])->count();
+        $pending = (clone $query)->whereIn('status', ['open', 'reopened'])->count();
+        $inProgress = (clone $query)->where('status', 'in_progress')->count();
         $resolved = (clone $query)->whereIn('status', ['resolved', 'closed'])->count();
         $escalated = $this->escalatedComplaintCount($query);
         $reopened = (clone $query)->where('status', 'reopened')->count();
@@ -158,14 +162,83 @@ class DashboardAnalyticsService
             ->value('avg_resolution_days');
 
         return [
+            'total_feedback' => $total + $this->buildFeedbackQuery($filters, $user)->count(),
             'total_complaints' => $total,
             'pending_complaints' => $pending,
+            'in_progress_complaints' => $inProgress,
             'resolved_complaints' => $resolved,
             'escalated_complaints' => $escalated,
             'reopened_complaints' => $reopened,
             'due_soon_complaints' => $dueSoon,
             'avg_resolution_days' => $avgResolution ? round((float) $avgResolution, 1) : 0,
         ];
+    }
+
+    private function buildFeedbackQuery(array $filters, Authenticatable $user): Builder
+    {
+        $query = Feedback::query();
+
+        if (! empty($filters['branch'])) {
+            $query->where('branch_id', $filters['branch']);
+        }
+
+        if (! empty($filters['from_date'])) {
+            $query->whereDate('created_at', '>=', $filters['from_date']);
+        }
+
+        if (! empty($filters['to_date'])) {
+            $query->whereDate('created_at', '<=', $filters['to_date']);
+        }
+
+        if (method_exists($user, 'isDepartmentScopedReviewer') && $user->isDepartmentScopedReviewer()) {
+            $query->where('department_id', $user->department_id);
+        } elseif (method_exists($user, 'isBranchScopedSupervisor') && $user->isBranchScopedSupervisor() && isset($user->branch_id)) {
+            $query->where('branch_id', $user->branch_id);
+        } elseif (method_exists($user, 'hasRole') && ($user->hasRole('Employee') || $user->hasRole('Customer'))) {
+            $query->where('user_id', $user->id);
+        }
+
+        return $query;
+    }
+
+    private function buildFeedbackDistribution(array $filters, Authenticatable $user): array
+    {
+        $query = FeedbackTicket::query();
+
+        if (! empty($filters['branch'])) {
+            $query->where('branch_id', $filters['branch']);
+        }
+
+        if (! empty($filters['from_date'])) {
+            $query->whereDate('created_at', '>=', $filters['from_date']);
+        }
+
+        if (! empty($filters['to_date'])) {
+            $query->whereDate('created_at', '<=', $filters['to_date']);
+        }
+
+        if (method_exists($user, 'isDepartmentScopedReviewer') && $user->isDepartmentScopedReviewer()) {
+            $query->where('department_id', $user->department_id);
+        } elseif (method_exists($user, 'isBranchScopedSupervisor') && $user->isBranchScopedSupervisor() && isset($user->branch_id)) {
+            $query->where('branch_id', $user->branch_id);
+        }
+
+        $counts = [
+            'complaints' => (clone $query)->where('category', 'complaint')->count(),
+            'suggestions' => (clone $query)->where('category', 'suggestion')->count(),
+            'compliments' => (clone $query)->where('satisfaction', 'like')->where('category', '!=', 'suggestion')->count(),
+        ];
+        $total = array_sum($counts);
+
+        return collect($counts)
+            ->map(fn (int $count, string $key) => [
+                'key' => $key,
+                'label' => __(ucfirst($key)),
+                'total' => $count,
+                'percent' => $total > 0 ? (int) round(($count / $total) * 100) : 0,
+            ])
+            ->values()
+            ->all();
     }
 
     private function buildTrendData(array $filters, Authenticatable $user): array

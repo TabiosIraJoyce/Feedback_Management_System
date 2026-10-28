@@ -2,16 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Branch;
 use App\Models\Complaint;
-use App\Models\Feedback;
-use App\Models\User;
+use App\Services\DashboardAnalyticsService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
-use App\Services\DashboardAnalyticsService;
 
 class DashboardController extends Controller
 {
@@ -20,28 +16,9 @@ class DashboardController extends Controller
         $user = $request->user();
         $dashboard = $analytics->getDashboardData($request, $user);
 
-        $recentComplaints = Complaint::with('branch')
-            ->when($user->isDepartmentScopedReviewer(), fn ($query) => $query->where('department_id', $user->department_id))
-            ->when($user->isBranchScopedSupervisor() && $user->branch_id, fn ($query) => $query->where('branch_id', $user->branch_id))
-            ->when($user->hasRole('Employee') || $user->hasRole('Customer'), fn ($query) => $query->where(function ($builder) use ($user) {
-                $builder->where('submitted_by_user_id', $user->id)
-                    ->orWhere('assigned_to_user_id', $user->id);
-            }))
-            ->latest()
-            ->take(8)
-            ->get();
-
         return view('dashboard', [
             'dashboard' => $dashboard,
-            'recentComplaints' => $recentComplaints,
-            'recentComplaintItems' => $this->recentComplaintsPayload($recentComplaints),
-            'branches' => Cache::remember('dashboard_branches_list', 3600, fn () => Branch::orderBy('name')->get(['id', 'name'])),
-            'statusOptions' => $analytics->statusOptions(),
-            'categories' => Cache::remember('dashboard_category_list', 3600, fn () => Complaint::select('category')
-                ->distinct()
-                ->orderBy('category')
-                ->pluck('category')
-                ->all()),
+            'urgentComplaintItems' => $this->urgentComplaintsPayload($this->urgentComplaints($user)),
         ]);
     }
 
@@ -56,33 +33,53 @@ class DashboardController extends Controller
 
         return response()->json([
             ...$dashboard,
-            'recent_complaints' => $this->recentComplaintsPayload($this->recentComplaints($user)),
+            'urgent_complaints' => $this->urgentComplaintsPayload($this->urgentComplaints($user)),
         ]);
     }
 
-    private function recentComplaints($user)
+    private function urgentComplaints($user)
     {
-        return Complaint::with('branch')
+        return $this->scopedComplaints($user)
+            ->with(['branch', 'assignee'])
+            ->where(function ($query): void {
+                $query->where(function ($urgent): void {
+                    $urgent->where('priority', 'urgent')
+                        ->whereNotIn('status', ['resolved', 'closed']);
+                })
+                    ->orWhere(function ($overdue): void {
+                        $overdue->whereNotNull('due_at')
+                            ->where('due_at', '<', now())
+                            ->whereNotIn('status', ['resolved', 'closed']);
+                    });
+            })
+            ->orderByRaw("CASE WHEN priority = 'urgent' THEN 0 ELSE 1 END")
+            ->latest()
+            ->take(5)
+            ->get();
+    }
+
+    private function scopedComplaints($user)
+    {
+        return Complaint::query()
             ->when($user->isDepartmentScopedReviewer(), fn ($query) => $query->where('department_id', $user->department_id))
             ->when($user->isBranchScopedSupervisor() && $user->branch_id, fn ($query) => $query->where('branch_id', $user->branch_id))
             ->when($user->hasRole('Employee') || $user->hasRole('Customer'), fn ($query) => $query->where(function ($builder) use ($user) {
                 $builder->where('submitted_by_user_id', $user->id)
                     ->orWhere('assigned_to_user_id', $user->id);
-            }))
-            ->latest()
-            ->take(8)
-            ->get();
+            }));
     }
 
-    private function recentComplaintsPayload($recentComplaints): array
+    private function urgentComplaintsPayload($urgentComplaints): array
     {
-        return $recentComplaints
+        return $urgentComplaints
             ->map(fn (Complaint $complaint) => [
                 'url' => route('complaints.show', $complaint),
                 'subject' => $complaint->subject,
                 'reference_no' => $complaint->reference_no,
-                'branch_name' => $complaint->branch->name,
-                'status' => $complaint->status,
+                'branch_name' => $complaint->branch?->name ?? __('Unknown branch'),
+                'assigned_to' => $complaint->assignee?->name ?? __('Unassigned'),
+                'priority' => $complaint->priority,
+                'priority_label' => __($complaint->priority === 'urgent' ? 'Urgent' : 'Overdue'),
                 'status_label' => __(str($complaint->status)->replace('_', ' ')->title()->toString()),
             ])
             ->values()
