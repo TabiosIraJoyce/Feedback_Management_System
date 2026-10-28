@@ -61,7 +61,7 @@
                 <div class="mb-6 flex items-start justify-between gap-4">
                     <div>
                         <h3 class="text-lg font-semibold text-slate-950 dark:text-slate-100">{{ __('Live Filter') }}</h3>
-                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ __('Narrow analytics by branch, product, status, category, or date range.') }}</p>
+                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ __('Narrow analytics by branch, status, category, or date range.') }}</p>
                     </div>
                     <button type="button" @click="resetFilters()" class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-300 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
                         <i data-lucide="rotate-ccw" class="h-4 w-4"></i>
@@ -69,23 +69,13 @@
                     </button>
                 </div>
 
-                <div class="grid gap-4 sm:grid-cols-2">
+                <div class="grid gap-x-5 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
                     <label class="block text-sm text-slate-600 dark:text-slate-300">
                         {{ __('Branch') }}
                         <select x-model="filters.branch" @change="refresh()" class="mt-2 block w-full rounded-3xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-cyan-500 focus:ring-cyan-500 dark:bg-slate-950 dark:border-slate-800 dark:text-slate-100">
                             <option value="">{{ __('All branches') }}</option>
                             @foreach ($branches as $branch)
                                 <option value="{{ $branch->id }}">{{ $branch->name }}</option>
-                            @endforeach
-                        </select>
-                    </label>
-
-                    <label class="block text-sm text-slate-600 dark:text-slate-300">
-                        {{ __('Product / Service') }}
-                        <select x-model="filters.product" @change="refresh()" class="mt-2 block w-full rounded-3xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-cyan-500 focus:ring-cyan-500 dark:bg-slate-950 dark:border-slate-800 dark:text-slate-100">
-                            <option value="">{{ __('All products') }}</option>
-                            @foreach ($products as $product)
-                                <option value="{{ $product->id }}">{{ $product->name }}</option>
                             @endforeach
                         </select>
                     </label>
@@ -191,7 +181,6 @@
                 ]),
                 filters: {
                     branch: '',
-                    product: '',
                     status: '',
                     category: '',
                     from_date: '',
@@ -201,7 +190,6 @@
                 init() {
                     const params = new URLSearchParams(window.location.search);
                     this.filters.branch = params.get('branch') ?? '';
-                    this.filters.product = params.get('product') ?? '';
                     this.filters.status = params.get('status') ?? '';
                     this.filters.category = params.get('category') ?? '';
                     this.filters.from_date = params.get('from_date') ?? '';
@@ -286,7 +274,7 @@
                     }
                 },
                 resetFilters() {
-                    this.filters = { branch: '', product: '', status: '', category: '', from_date: '', to_date: '' };
+                    this.filters = { branch: '', status: '', category: '', from_date: '', to_date: '' };
                     this.refresh();
                 },
             }

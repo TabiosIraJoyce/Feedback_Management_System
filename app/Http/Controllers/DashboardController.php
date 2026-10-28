@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\Branch;
 use App\Models\Complaint;
 use App\Models\Feedback;
-use App\Models\Product;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
@@ -37,7 +36,6 @@ class DashboardController extends Controller
             'recentComplaints' => $recentComplaints,
             'recentComplaintItems' => $this->recentComplaintsPayload($recentComplaints),
             'branches' => Cache::remember('dashboard_branches_list', 3600, fn () => Branch::orderBy('name')->get(['id', 'name'])),
-            'products' => Cache::remember('dashboard_products_list', 3600, fn () => Product::orderBy('name')->get(['id', 'name'])),
             'statusOptions' => $analytics->statusOptions(),
             'categories' => Cache::remember('dashboard_category_list', 3600, fn () => Complaint::select('category')
                 ->distinct()
