@@ -11,7 +11,31 @@
     </x-slot>
 
     <div class="space-y-4">
-        @foreach ($complaints as $complaint)
+        <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <form method="GET" action="{{ route('complaints.index') }}" class="flex flex-col gap-3 sm:flex-row sm:items-end">
+                <label for="complaint-status-filter" class="block flex-1 text-sm font-medium text-slate-700">
+                    {{ __('Filter by status') }}
+                    <select id="complaint-status-filter" name="status" class="mt-2 block min-h-12 w-full rounded-2xl border-slate-300 bg-white px-4 text-sm text-slate-800 shadow-sm focus:border-cyan-500 focus:ring-cyan-500">
+                        <option value="">{{ __('All statuses') }}</option>
+                        @foreach ($statusOptions as $status => $label)
+                            <option value="{{ $status }}" @selected($selectedStatus === $status)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </label>
+                <div class="flex items-center gap-2">
+                    <button type="submit" class="min-h-12 rounded-2xl bg-cyan-700 px-5 text-sm font-semibold text-white transition hover:bg-cyan-800">
+                        {{ __('Apply filter') }}
+                    </button>
+                    @if ($selectedStatus !== '')
+                        <a href="{{ route('complaints.index') }}" class="inline-flex min-h-12 items-center rounded-2xl border border-slate-300 px-5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+                            {{ __('Clear') }}
+                        </a>
+                    @endif
+                </div>
+            </form>
+        </section>
+
+        @forelse ($complaints as $complaint)
             <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
                 <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div>
@@ -47,7 +71,14 @@
                     </div>
                 </div>
             </div>
-        @endforeach
+        @empty
+            <div class="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
+                <h2 class="text-lg font-semibold text-slate-900">{{ __('No complaints found') }}</h2>
+                <p class="mt-2 text-sm text-slate-600">
+                    {{ $selectedStatus !== '' ? __('There are no complaints with this status.') : __('There are no complaints to display yet.') }}
+                </p>
+            </div>
+        @endforelse
 
         {{ $complaints->links() }}
     </div>

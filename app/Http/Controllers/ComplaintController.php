@@ -23,6 +23,14 @@ class ComplaintController extends Controller
     public function index(Request $request): View
     {
         $user = $request->user();
+        $statusOptions = [
+            'open' => __('Open'),
+            'in_progress' => __('In Progress'),
+            'resolved' => __('Resolved'),
+            'closed' => __('Closed'),
+            'reopened' => __('Reopened'),
+        ];
+        $selectedStatus = $request->query('status');
         $complaints = Complaint::with(['branch', 'department', 'submitter', 'assignee', 'attachments']);
 
         if ($user->isDepartmentScopedReviewer()) {
@@ -36,8 +44,16 @@ class ComplaintController extends Controller
             });
         }
 
+        if (is_string($selectedStatus) && array_key_exists($selectedStatus, $statusOptions)) {
+            $complaints->where('status', $selectedStatus);
+        } else {
+            $selectedStatus = '';
+        }
+
         return view('complaints.index', [
-            'complaints' => $complaints->latest()->paginate(10),
+            'complaints' => $complaints->latest()->paginate(10)->withQueryString(),
+            'statusOptions' => $statusOptions,
+            'selectedStatus' => $selectedStatus,
             'branches' => $this->branchesForUser($user),
             'departments' => $this->departmentsForUser($user),
             'assignableUsers' => $this->assignableUsersFor($user),
