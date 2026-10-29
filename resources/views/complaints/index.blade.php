@@ -12,8 +12,8 @@
 
     <div class="space-y-4">
         <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <form method="GET" action="{{ route('complaints.index') }}" class="flex flex-col gap-3 sm:flex-row sm:items-end">
-                <label for="complaint-status-filter" class="block flex-1 text-sm font-medium text-slate-700">
+            <form method="GET" action="{{ route('complaints.index') }}" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <label for="complaint-status-filter" class="block text-sm font-medium text-slate-700">
                     {{ __('Filter by status') }}
                     <select id="complaint-status-filter" name="status" class="mt-2 block min-h-12 w-full rounded-2xl border-slate-300 bg-white px-4 text-sm text-slate-800 shadow-sm focus:border-cyan-500 focus:ring-cyan-500">
                         <option value="">{{ __('All statuses') }}</option>
@@ -22,11 +22,63 @@
                         @endforeach
                     </select>
                 </label>
-                <div class="flex items-center gap-2">
+                <label class="block text-sm font-medium text-slate-700">
+                    {{ __('Due date') }}
+                    <select name="due" class="mt-2 block min-h-12 w-full rounded-2xl border-slate-300 bg-white px-4 text-sm text-slate-800 shadow-sm">
+                        <option value="">{{ __('Any due date') }}</option>
+                        <option value="overdue" @selected(request('due') === 'overdue')>{{ __('Overdue') }}</option>
+                        <option value="soon" @selected(request('due') === 'soon')>{{ __('Due in the next 8 hours') }}</option>
+                    </select>
+                </label>
+                <label class="block text-sm font-medium text-slate-700">
+                    {{ __('Branch') }}
+                    <select name="branch" class="mt-2 block min-h-12 w-full rounded-2xl border-slate-300 bg-white px-4 text-sm text-slate-800 shadow-sm">
+                        <option value="">{{ __('All branches') }}</option>
+                        @foreach ($branches as $branch)
+                            <option value="{{ $branch->id }}" @selected(request('branch') == $branch->id)>{{ $branch->name }}</option>
+                        @endforeach
+                    </select>
+                </label>
+                <label class="block text-sm font-medium text-slate-700">
+                    {{ __('Department') }}
+                    <select name="department" class="mt-2 block min-h-12 w-full rounded-2xl border-slate-300 bg-white px-4 text-sm text-slate-800 shadow-sm">
+                        <option value="">{{ __('All departments') }}</option>
+                        @foreach ($departments as $department)
+                            <option value="{{ $department->id }}" @selected(request('department') == $department->id)>{{ $department->name }}</option>
+                        @endforeach
+                    </select>
+                </label>
+                <label class="block text-sm font-medium text-slate-700">
+                    {{ __('Category') }}
+                    <select name="category" class="mt-2 block min-h-12 w-full rounded-2xl border-slate-300 bg-white px-4 text-sm text-slate-800 shadow-sm">
+                        <option value="">{{ __('All categories') }}</option>
+                        @foreach ($categories as $category)
+                            <option value="{{ $category }}" @selected(request('category') === $category)>{{ ucfirst($category) }}</option>
+                        @endforeach
+                    </select>
+                </label>
+                <label class="block text-sm font-medium text-slate-700">
+                    {{ __('Escalation level') }}
+                    <select name="escalation_level" class="mt-2 block min-h-12 w-full rounded-2xl border-slate-300 bg-white px-4 text-sm text-slate-800 shadow-sm">
+                        <option value="">{{ __('All levels') }}</option>
+                        <option value="0" @selected(request('escalation_level') === '0')>{{ __('Supervisor') }}</option>
+                        <option value="1" @selected(request('escalation_level') === '1')>{{ __('Department Head') }}</option>
+                        <option value="2" @selected(request('escalation_level') === '2')>{{ __('Upper Management') }}</option>
+                    </select>
+                </label>
+                <label class="block text-sm font-medium text-slate-700">
+                    {{ __('From') }}
+                    <input type="date" name="from_date" value="{{ request('from_date') }}" class="mt-2 block min-h-12 w-full rounded-2xl border-slate-300 px-4 text-sm shadow-sm" />
+                </label>
+                <label class="block text-sm font-medium text-slate-700">
+                    {{ __('To') }}
+                    <input type="date" name="to_date" value="{{ request('to_date') }}" class="mt-2 block min-h-12 w-full rounded-2xl border-slate-300 px-4 text-sm shadow-sm" />
+                </label>
+                <div class="flex items-end gap-2 xl:col-span-4">
                     <button type="submit" class="min-h-12 rounded-2xl bg-cyan-700 px-5 text-sm font-semibold text-white transition hover:bg-cyan-800">
                         {{ __('Apply filter') }}
                     </button>
-                    @if ($selectedStatus !== '')
+                    @if (request()->query())
                         <a href="{{ route('complaints.index') }}" class="inline-flex min-h-12 items-center rounded-2xl border border-slate-300 px-5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
                             {{ __('Clear') }}
                         </a>

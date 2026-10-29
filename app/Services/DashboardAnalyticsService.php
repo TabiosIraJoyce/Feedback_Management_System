@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Branch;
 use App\Models\Complaint;
+use App\Models\ComplaintStatusHistory;
 use App\Models\Department;
 use App\Models\Feedback;
 use App\Models\FeedbackTicket;
@@ -23,6 +24,7 @@ class DashboardAnalyticsService
     private const COMPLAINT_STATUSES = [
         'open' => 'Open',
         'in_progress' => 'In Progress',
+        'escalated' => 'Escalated',
         'resolved' => 'Resolved',
         'closed' => 'Closed',
         'reopened' => 'Reopened',
@@ -50,7 +52,7 @@ class DashboardAnalyticsService
     public function getDashboardData(Request $request, Authenticatable $user): array
     {
         $filters = $this->buildFilters($request);
-        $cacheKey = $this->buildCacheKey($filters, $user->getAuthIdentifier());
+        $cacheKey = $this->buildCacheKey($filters, $user);
 
         return Cache::remember($cacheKey, self::CACHE_TTL, fn () => $this->buildDashboardPayload($filters, $user));
     }
@@ -77,8 +79,8 @@ class DashboardAnalyticsService
                 'trend' => $trend,
                 'status_distribution' => $statusDistribution,
                 'category' => $categoryAnalytics,
-                'feedback_distribution' => $this->buildFeedbackDistribution($filters, $user),
-                'department_highlights' => $this->buildDepartmentHighlights($filters, $user),
+                'feedback_distribution' => $user->hasRole('Upper Management') ? [] : $this->buildFeedbackDistribution($filters, $user),
+                'department_highlights' => $user->hasRole(['Admin', 'Super Admin']) ? $this->buildDepartmentHighlights($filters, $user) : [],
                 'branch_performance' => $branchPerformance,
                 'product' => $productAnalytics,
                 'sla' => $slaAnalytics,
@@ -126,23 +128,30 @@ class DashboardAnalyticsService
 
     private function applyUserScope(Builder $query, Authenticatable $user): Builder
     {
-        if (method_exists($user, 'isDepartmentScopedReviewer') && $user->isDepartmentScopedReviewer()) {
-            $query->where('department_id', $user->department_id);
-        } elseif (method_exists($user, 'hasRole') && $user->hasRole('Supervisor') && isset($user->branch_id)) {
-            $query->where('branch_id', $user->branch_id);
+        if (method_exists($user, 'hasRole') && $user->hasRole('Supervisor')) {
+            $query->where('assigned_to_user_id', $user->id)->where('escalation_level', 0);
+        } elseif (method_exists($user, 'hasRole') && $user->hasRole('Department Head')) {
+            $query->where('assigned_to_user_id', $user->id)->where('escalation_level', 1);
+        } elseif (method_exists($user, 'hasRole') && $user->hasRole('Upper Management')) {
+            $query->where('assigned_to_user_id', $user->id)->where('escalation_level', 2);
         } elseif (method_exists($user, 'hasRole') && ($user->hasRole('Employee') || $user->hasRole('Customer'))) {
-            $query->where(function (Builder $scope) use ($user): void {
-                $scope->where('submitted_by_user_id', $user->id)
-                    ->orWhere('assigned_to_user_id', $user->id);
-            });
+            $query->where('submitted_by_user_id', $user->id);
         }
 
         return $query;
     }
 
-    private function buildCacheKey(array $filters, int|string $userId): string
+    private function buildCacheKey(array $filters, Authenticatable $user): string
     {
-        return 'dashboard_metrics_v3_'.md5($userId.'|'.json_encode($filters));
+        $roles = method_exists($user, 'getRoleNames') ? $user->getRoleNames()->sort()->implode(',') : '';
+        $scope = implode('|', [
+            $user->getAuthIdentifier(),
+            $roles,
+            $user->branch_id ?? '',
+            $user->department_id ?? '',
+        ]);
+
+        return 'dashboard_metrics_v3_'.md5($scope.'|'.json_encode($filters));
     }
 
     private function buildSummary(Builder $query, array $filters, Authenticatable $user): array
@@ -153,6 +162,15 @@ class DashboardAnalyticsService
         $resolved = (clone $query)->whereIn('status', ['resolved', 'closed'])->count();
         $escalated = $this->escalatedComplaintCount($query);
         $reopened = (clone $query)->where('status', 'reopened')->count();
+        $awaitingReview = (clone $query)->where('status', 'escalated')->count();
+        $escalatedToDepartmentHead = ComplaintStatusHistory::query()
+            ->where('action', 'escalated_to_department_head')
+            ->when(method_exists($user, 'hasRole') && $user->hasRole('Supervisor'), fn ($history) => $history->where('from_assigned_user_id', $user->id))
+            ->count();
+        $escalatedToUpperManagement = ComplaintStatusHistory::query()
+            ->where('action', 'escalated_to_upper_management')
+            ->when(method_exists($user, 'hasRole') && $user->hasRole('Department Head'), fn ($history) => $history->where('actor_user_id', $user->id))
+            ->count();
         $dueSoon = (clone $query)
             ->whereNotNull('due_at')
             ->whereBetween('due_at', [Carbon::now(), Carbon::now()->addHours(8)])
@@ -165,13 +183,16 @@ class DashboardAnalyticsService
             ->value('avg_resolution_days');
 
         return [
-            'total_feedback' => $total + $this->buildFeedbackQuery($filters, $user)->count(),
+            'total_feedback' => $this->buildFeedbackSubmissionCount($filters, $user),
             'total_complaints' => $total,
             'pending_complaints' => $pending,
             'in_progress_complaints' => $inProgress,
             'resolved_complaints' => $resolved,
             'escalated_complaints' => $escalated,
             'reopened_complaints' => $reopened,
+            'awaiting_review' => $awaitingReview,
+            'escalated_to_department_head' => $escalatedToDepartmentHead,
+            'escalated_to_upper_management' => $escalatedToUpperManagement,
             'due_soon_complaints' => $dueSoon,
             'avg_resolution_days' => $avgResolution ? round((float) $avgResolution, 1) : 0,
         ];
@@ -179,10 +200,19 @@ class DashboardAnalyticsService
 
     private function buildFeedbackQuery(array $filters, Authenticatable $user): Builder
     {
-        $query = Feedback::query();
+        $query = Feedback::query()->where('type', 'customer');
 
         if (! empty($filters['branch'])) {
             $query->where('branch_id', $filters['branch']);
+        }
+
+        if (! empty($filters['department'])) {
+            $query->where('department_id', $filters['department']);
+        }
+
+        if (! empty($filters['product'])) {
+            $branchIds = DB::table('branch_products')->where('product_id', $filters['product'])->pluck('branch_id');
+            $query->whereIn('branch_id', $branchIds->isNotEmpty() ? $branchIds : [0]);
         }
 
         if (! empty($filters['from_date'])) {
@@ -195,10 +225,63 @@ class DashboardAnalyticsService
 
         if (method_exists($user, 'isDepartmentScopedReviewer') && $user->isDepartmentScopedReviewer()) {
             $query->where('department_id', $user->department_id);
+        } elseif (method_exists($user, 'hasRole') && $user->hasRole('Supervisor') && ! empty($user->department_id)) {
+            $query->where('department_id', $user->department_id);
         } elseif (method_exists($user, 'isBranchScopedSupervisor') && $user->isBranchScopedSupervisor() && isset($user->branch_id)) {
             $query->where('branch_id', $user->branch_id);
         } elseif (method_exists($user, 'hasRole') && ($user->hasRole('Employee') || $user->hasRole('Customer'))) {
             $query->where('user_id', $user->id);
+        } elseif (method_exists($user, 'hasRole') && $user->hasRole('Upper Management')) {
+            $query->whereRaw('1 = 0');
+        }
+
+        return $query;
+    }
+
+    private function buildFeedbackSubmissionCount(array $filters, Authenticatable $user): int
+    {
+        if (method_exists($user, 'hasRole') && $user->hasRole('Upper Management')) {
+            return (clone $this->buildComplaintQuery($filters, $user))->count();
+        }
+
+        $tickets = $this->buildFeedbackTicketQuery($filters, $user)->count();
+        $authenticatedFeedback = $this->buildFeedbackQuery($filters, $user)->whereNotNull('user_id')->count();
+
+        $customerComplaints = Complaint::query()
+            ->whereHas('submitter', fn (Builder $submitter) => $submitter->role('Customer'))
+            ->when(! empty($filters['branch']), fn ($query) => $query->where('branch_id', $filters['branch']))
+            ->when(! empty($filters['department']), fn ($query) => $query->where('department_id', $filters['department']))
+            ->when(! empty($filters['from_date']), fn ($query) => $query->whereDate('created_at', '>=', $filters['from_date']))
+            ->when(! empty($filters['to_date']), fn ($query) => $query->whereDate('created_at', '<=', $filters['to_date']))
+            ->when(! empty($filters['product']), function ($query) use ($filters): void {
+                $branchIds = DB::table('branch_products')->where('product_id', $filters['product'])->pluck('branch_id');
+                $query->whereIn('branch_id', $branchIds->isNotEmpty() ? $branchIds : [0]);
+            })
+            ->when(method_exists($user, 'hasRole') && $user->hasRole('Customer'), fn ($query) => $query->where('submitted_by_user_id', $user->getAuthIdentifier()))
+            ->when(method_exists($user, 'isDepartmentScopedReviewer') && $user->isDepartmentScopedReviewer(), fn ($query) => $query->where('department_id', $user->department_id))
+            ->when(method_exists($user, 'isBranchScopedSupervisor') && $user->isBranchScopedSupervisor() && isset($user->branch_id), fn ($query) => $query->where('branch_id', $user->branch_id))
+            ->count();
+
+        return $tickets + $authenticatedFeedback + $customerComplaints;
+    }
+
+    private function buildFeedbackTicketQuery(array $filters, Authenticatable $user): Builder
+    {
+        $query = FeedbackTicket::query()
+            ->when(! empty($filters['branch']), fn ($query) => $query->where('branch_id', $filters['branch']))
+            ->when(! empty($filters['department']), fn ($query) => $query->where('department_id', $filters['department']))
+            ->when(! empty($filters['from_date']), fn ($query) => $query->whereDate('created_at', '>=', $filters['from_date']))
+            ->when(! empty($filters['to_date']), fn ($query) => $query->whereDate('created_at', '<=', $filters['to_date']))
+            ->when(! empty($filters['product']), function ($query) use ($filters): void {
+                $branchIds = DB::table('branch_products')->where('product_id', $filters['product'])->pluck('branch_id');
+                $query->whereIn('branch_id', $branchIds->isNotEmpty() ? $branchIds : [0]);
+            })
+            ->when(method_exists($user, 'isDepartmentScopedReviewer') && $user->isDepartmentScopedReviewer(), fn ($query) => $query->where('department_id', $user->department_id))
+            ->when(method_exists($user, 'hasRole') && $user->hasRole('Supervisor') && ! empty($user->department_id), fn ($query) => $query->where('department_id', $user->department_id))
+            ->when(method_exists($user, 'isBranchScopedSupervisor') && $user->isBranchScopedSupervisor() && isset($user->branch_id), fn ($query) => $query->where('branch_id', $user->branch_id));
+
+        if (method_exists($user, 'hasRole') && ($user->hasRole('Upper Management') || $user->hasRole('Employee') || $user->hasRole('Customer'))) {
+            $query->whereRaw('1 = 0');
         }
 
         return $query;
@@ -206,30 +289,13 @@ class DashboardAnalyticsService
 
     private function buildFeedbackDistribution(array $filters, Authenticatable $user): array
     {
-        $query = FeedbackTicket::query();
-
-        if (! empty($filters['branch'])) {
-            $query->where('branch_id', $filters['branch']);
-        }
-
-        if (! empty($filters['from_date'])) {
-            $query->whereDate('created_at', '>=', $filters['from_date']);
-        }
-
-        if (! empty($filters['to_date'])) {
-            $query->whereDate('created_at', '<=', $filters['to_date']);
-        }
-
-        if (method_exists($user, 'isDepartmentScopedReviewer') && $user->isDepartmentScopedReviewer()) {
-            $query->where('department_id', $user->department_id);
-        } elseif (method_exists($user, 'isBranchScopedSupervisor') && $user->isBranchScopedSupervisor() && isset($user->branch_id)) {
-            $query->where('branch_id', $user->branch_id);
-        }
+        $query = $this->buildFeedbackTicketQuery($filters, $user);
 
         $counts = [
-            'complaints' => (clone $query)->where('category', 'complaint')->count(),
+            'complaints' => (clone $query)->where('category', 'complaint')->count() + $this->authenticatedCustomerComplaintCount($filters, $user),
             'suggestions' => (clone $query)->where('category', 'suggestion')->count(),
-            'compliments' => (clone $query)->where('satisfaction', 'like')->where('category', '!=', 'suggestion')->count(),
+            'compliments' => (clone $query)->whereIn('satisfaction', ['like', 'good', 'positive'])->where('category', '!=', 'suggestion')->count()
+                + $this->buildFeedbackQuery($filters, $user)->whereNotNull('user_id')->where('sentiment', 'positive')->count(),
         ];
         $total = array_sum($counts);
 
@@ -244,6 +310,20 @@ class DashboardAnalyticsService
             ->all();
     }
 
+    private function authenticatedCustomerComplaintCount(array $filters, Authenticatable $user): int
+    {
+        $query = Complaint::query()
+            ->whereHas('submitter', fn (Builder $submitter) => $submitter->role('Customer'))
+            ->when(! empty($filters['branch']), fn ($builder) => $builder->where('branch_id', $filters['branch']))
+            ->when(! empty($filters['from_date']), fn ($builder) => $builder->whereDate('created_at', '>=', $filters['from_date']))
+            ->when(! empty($filters['to_date']), fn ($builder) => $builder->whereDate('created_at', '<=', $filters['to_date']))
+            ->when(method_exists($user, 'isDepartmentScopedReviewer') && $user->isDepartmentScopedReviewer(), fn ($builder) => $builder->where('department_id', $user->department_id))
+            ->when(method_exists($user, 'hasRole') && $user->hasRole('Supervisor') && ! empty($user->department_id), fn ($builder) => $builder->where('department_id', $user->department_id))
+            ->when(method_exists($user, 'isBranchScopedSupervisor') && $user->isBranchScopedSupervisor() && isset($user->branch_id), fn ($builder) => $builder->where('branch_id', $user->branch_id));
+
+        return $this->applyUserScope($query, $user)->count();
+    }
+
     private function buildDepartmentHighlights(array $filters, Authenticatable $user): array
     {
         $complaintCounts = $this->buildComplaintQuery($filters, $user)
@@ -252,12 +332,27 @@ class DashboardAnalyticsService
             ->groupBy('department_id')
             ->pluck('total', 'department_id');
 
-        $positiveFeedbackCounts = $this->buildFeedbackQuery($filters, $user)
-            ->where('sentiment', 'positive')
+        $publicPositiveCounts = $this->buildFeedbackTicketQuery($filters, $user)
+            ->whereIn('satisfaction', ['like', 'good', 'positive'])
             ->whereNotNull('department_id')
             ->select('department_id', DB::raw('COUNT(*) as total'))
             ->groupBy('department_id')
             ->pluck('total', 'department_id');
+
+        $authenticatedPositiveCounts = $this->buildFeedbackQuery($filters, $user)
+            ->where('sentiment', 'positive')
+            ->whereNotNull('user_id')
+            ->whereNotNull('department_id')
+            ->select('department_id', DB::raw('COUNT(*) as total'))
+            ->groupBy('department_id')
+            ->pluck('total', 'department_id');
+        $positiveFeedbackCounts = $publicPositiveCounts;
+        foreach ($authenticatedPositiveCounts as $departmentId => $count) {
+            $positiveFeedbackCounts->put(
+                $departmentId,
+                (int) $positiveFeedbackCounts->get($departmentId, 0) + (int) $count,
+            );
+        }
 
         $departmentIds = $complaintCounts->keys()
             ->merge($positiveFeedbackCounts->keys())
@@ -503,6 +598,9 @@ class DashboardAnalyticsService
             $query->where('complaints.department_id', $user->department_id);
         } elseif (method_exists($user, 'hasRole') && $user->hasRole('Supervisor') && isset($user->branch_id)) {
             $query->where('complaints.branch_id', $user->branch_id);
+        } elseif (method_exists($user, 'hasRole') && $user->hasRole('Upper Management')) {
+            $query->where('complaints.assigned_to_user_id', $user->getAuthIdentifier())
+                ->where('complaints.escalation_level', 2);
         } elseif (method_exists($user, 'hasRole') && ($user->hasRole('Employee') || $user->hasRole('Customer'))) {
             $query->where(function ($builder) use ($user): void {
                 $builder->where('complaints.submitted_by_user_id', $user->id)
@@ -513,20 +611,14 @@ class DashboardAnalyticsService
 
     private function escalatedComplaintCount(Builder $query): int
     {
-        return (clone $query)
-            ->whereExists(function ($subquery) {
-                $subquery->selectRaw('1')
-                    ->from('sla_escalations')
-                    ->whereColumn('sla_escalations.complaint_id', 'complaints.id');
-            })
-            ->count();
+        return (clone $query)->where('escalation_level', '>', 0)->count();
     }
 
     private function escalatedComplaintsSubquery()
     {
-        return DB::table('sla_escalations')
-            ->select('complaint_id')
-            ->distinct();
+        return DB::table('complaints')
+            ->where('escalation_level', '>', 0)
+            ->selectRaw('id as complaint_id');
     }
 
     private function resolutionDaysExpression(): string

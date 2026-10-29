@@ -3,7 +3,6 @@
 namespace App\Models;
 
 // BusinessType model removed — association deprecated
-use App\Models\EmployeeFeedback;
 use App\Models\Form;
 use App\Models\FormSubmission;
 use App\Models\Product;
@@ -126,11 +125,6 @@ class Branch extends Model
     public function departments(): HasMany
     {
         return $this->hasMany(Department::class);
-    }
-
-    public function employeeFeedback(): HasMany
-    {
-        return $this->hasMany(EmployeeFeedback::class);
     }
 
     public function products(): BelongsToMany

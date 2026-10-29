@@ -12,11 +12,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Notification;
 
 class Complaint extends Model
 {
     /** @use HasFactory<ComplaintFactory> */
     use HasFactory, SoftDeletes;
+
+    public bool $skipAutomaticStatusHistory = false;
 
     protected $fillable = [
         'branch_id',
@@ -31,6 +34,7 @@ class Complaint extends Model
         'category',
         'priority',
         'status',
+        'escalation_level',
         'message',
         'sentiment',
         'resolution_summary',
@@ -51,6 +55,7 @@ class Complaint extends Model
             'resolved_at' => 'datetime',
             'closed_at' => 'datetime',
             'allow_public_reopen' => 'boolean',
+            'escalation_level' => 'integer',
             'satisfaction_submitted_at' => 'datetime',
             'public_reopened_at' => 'datetime',
         ];
@@ -69,7 +74,10 @@ class Complaint extends Model
         static::created(function (Complaint $complaint): void {
             ComplaintStatusHistory::create([
                 'complaint_id' => $complaint->id,
+                'actor_user_id' => auth()->id(),
                 'status' => $complaint->status,
+                'action' => 'submitted',
+                'new_status' => $complaint->status,
                 'title' => 'Complaint Submitted',
                 'note' => 'Complaint was submitted.',
                 'visible_to_public' => true,
@@ -77,12 +85,23 @@ class Complaint extends Model
         });
 
         static::updated(function (Complaint $complaint): void {
-            if ($complaint->wasChanged('status')) {
+            if ($complaint->wasChanged(['status', 'assigned_to_user_id']) && ! $complaint->skipAutomaticStatusHistory) {
+                $oldStatus = $complaint->getOriginal('status');
+                $oldAssignee = $complaint->getOriginal('assigned_to_user_id');
+                $statusChanged = $complaint->wasChanged('status');
                 ComplaintStatusHistory::create([
                     'complaint_id' => $complaint->id,
+                    'actor_user_id' => auth()->id(),
+                    'from_assigned_user_id' => $oldAssignee,
+                    'to_assigned_user_id' => $complaint->assigned_to_user_id,
                     'status' => $complaint->status,
-                    'title' => 'Status Changed',
-                    'note' => 'Status changed to '.ucwords(str_replace('_', ' ', $complaint->status)).'.',
+                    'action' => $statusChanged ? 'status_updated' : 'assigned',
+                    'previous_status' => $oldStatus,
+                    'new_status' => $complaint->status,
+                    'title' => $statusChanged ? 'Status Changed' : 'Assignment Changed',
+                    'note' => $statusChanged
+                        ? 'Status changed to '.ucwords(str_replace('_', ' ', $complaint->status)).'.'
+                        : 'Complaint assignment changed.',
                     'visible_to_public' => true,
                 ]);
             }
@@ -103,6 +122,16 @@ class Complaint extends Model
                     Cache::forget("user_notifications_{$user->id}");
                     Cache::forget("user_unread_notifications_{$user->id}");
                 });
+
+            if ($complaint->wasChanged('status') && $complaint->customer_email) {
+                try {
+                    Notification::route('mail', $complaint->customer_email)->notify(
+                        new ComplaintStatusUpdatedNotification($complaint, $message, $complaint->notificationAction())
+                    );
+                } catch (\Throwable $exception) {
+                    report($exception);
+                }
+            }
         });
     }
 

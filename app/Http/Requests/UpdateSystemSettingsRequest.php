@@ -21,6 +21,7 @@ class UpdateSystemSettingsRequest extends FormRequest
             'default_sla_hours' => ['nullable', 'integer', 'min:0', 'max:8760'],
             'enable_notifications' => ['nullable', 'boolean'],
             'enable_dark_mode' => ['nullable', 'boolean'],
+            'upper_management_user_id' => ['nullable', 'integer', 'exists:users,id'],
             'default_language' => ['nullable', 'string', 'in:en,fil,ilo'],
             'qr_defaults' => ['nullable', 'array'],
             'qr_defaults.*' => ['string'],
@@ -33,5 +34,17 @@ class UpdateSystemSettingsRequest extends FormRequest
             'enable_notifications' => $this->has('enable_notifications') ? true : false,
             'enable_dark_mode' => $this->has('enable_dark_mode') ? true : false,
         ]);
+    }
+
+    public function after(): array
+    {
+        return [
+            function ($validator): void {
+                $id = $this->input('upper_management_user_id');
+                if ($id && ! \App\Models\User::role('Upper Management')->whereKey($id)->where('is_active', true)->exists()) {
+                    $validator->errors()->add('upper_management_user_id', 'Choose an active account with the Upper Management role.');
+                }
+            },
+        ];
     }
 }

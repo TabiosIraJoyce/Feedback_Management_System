@@ -35,7 +35,7 @@ class UpdateFeedbackRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'max:255'],
             'subject' => ['required', 'string', 'max:255'],
-            'type' => ['required', 'in:internal,customer'],
+            'type' => ['required', 'in:customer'],
             'status' => ['required', 'in:submitted,reviewed,archived'],
             'message' => ['required', 'string', 'min:10'],
             'sentiment' => ['nullable', 'in:positive,negative'],

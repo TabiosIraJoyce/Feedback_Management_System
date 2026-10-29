@@ -4,9 +4,11 @@ namespace App\Services\Reports;
 
 use App\Models\Branch;
 use App\Models\Complaint;
+use App\Models\ComplaintStatusHistory;
+use App\Models\Department;
 use App\Models\Feedback;
+use App\Models\FeedbackTicket;
 use App\Models\Product;
-use App\Models\SlaEscalation;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -19,15 +21,10 @@ class ReportService
     private const COMPLAINT_STATUSES = [
         'open' => 'Open',
         'in_progress' => 'In Progress',
+        'escalated' => 'Escalated',
         'resolved' => 'Resolved',
         'closed' => 'Closed',
         'reopened' => 'Reopened',
-    ];
-
-    private const FEEDBACK_STATUSES = [
-        'submitted' => 'Submitted',
-        'reviewed' => 'Reviewed',
-        'archived' => 'Archived',
     ];
 
     public function reportDefinitions(): array
@@ -37,7 +34,6 @@ class ReportService
             'branch-performance' => 'Branch Performance',
             'product-services' => 'Product / Service',
             'sla-performance' => 'SLA Performance',
-            'employee-feedback' => 'Employee Feedback',
             'complaint-trends' => 'Complaint Trends',
             'reopened-complaints' => 'Reopened Complaints',
             'escalation-reports' => 'Escalation Reports',
@@ -52,6 +48,10 @@ class ReportService
                 ->when(method_exists($user, 'isScopedReviewer') && $user->isScopedReviewer() && isset($user->branch_id), fn ($query) => $query->whereKey($user->branch_id))
                 ->orderBy('name')
                 ->get(['id', 'name']),
+            'departments' => Department::query()
+                ->when(method_exists($user, 'isDepartmentScopedReviewer') && $user->isDepartmentScopedReviewer(), fn ($query) => $query->whereKey($user->department_id))
+                ->when(method_exists($user, 'isBranchScopedSupervisor') && $user->isBranchScopedSupervisor() && $user->branch_id, fn ($query) => $query->where('branch_id', $user->branch_id))
+                ->orderBy('name')->get(['id', 'name', 'branch_id']),
             'products' => Product::orderBy('name')->get(['id', 'name']),
             'statuses' => $this->statusOptionsForReport($report),
             'categories' => Complaint::query()->select('category')->distinct()->orderBy('category')->pluck('category')->filter()->values(),
@@ -69,9 +69,7 @@ class ReportService
 
     public function statusOptionsForReport(string $report): array
     {
-        return $report === 'employee-feedback'
-            ? self::FEEDBACK_STATUSES
-            : self::COMPLAINT_STATUSES;
+        return self::COMPLAINT_STATUSES;
     }
 
     public function normalizeFilters(array $input): array
@@ -79,6 +77,7 @@ class ReportService
         return [
             'report' => $input['report'] ?? 'complaint-summary',
             'branch' => $input['branch'] ?? null,
+            'department' => $input['department'] ?? null,
             'product' => $input['product'] ?? null,
             'status' => $input['status'] ?? null,
             'category' => $input['category'] ?? null,
@@ -90,7 +89,6 @@ class ReportService
     public function widgets(array $filters, Authenticatable $user): array
     {
         $complaints = $this->complaintQuery($filters, $user);
-        $feedback = $this->feedbackQuery($filters, $user);
 
         $totalComplaints = (clone $complaints)->count();
         $resolvedComplaints = (clone $complaints)->whereIn('status', ['resolved', 'closed'])->count();
@@ -100,7 +98,7 @@ class ReportService
             ->where('due_at', '<', now())
             ->whereNotIn('status', ['resolved', 'closed'])
             ->count();
-        $feedbackCount = (clone $feedback)->count();
+        $feedbackCount = $this->feedbackSubmissionCount($filters);
 
         return [
             'total_complaints' => $totalComplaints,
@@ -119,7 +117,6 @@ class ReportService
             'branch-performance' => $this->branchPerformanceReport($filters, $user, $paginate),
             'product-services' => $this->productServicesReport($filters, $user, $paginate),
             'sla-performance' => $this->slaPerformanceReport($filters, $user, $paginate),
-            'employee-feedback' => $this->employeeFeedbackReport($filters, $user, $paginate),
             'complaint-trends' => $this->complaintTrendReport($filters, $user, $paginate),
             'reopened-complaints' => $this->reopenedComplaintsReport($filters, $user, $paginate),
             'escalation-reports' => $this->escalationReport($filters, $user, $paginate),
@@ -272,32 +269,6 @@ class ReportService
         ];
     }
 
-    private function employeeFeedbackReport(array $filters, Authenticatable $user, bool $paginate): array
-    {
-        $query = $this->feedbackQuery($filters, $user)
-            ->with(['branch:id,name', 'user:id,name'])
-            ->where('type', 'internal')
-            ->latest();
-
-        return [
-            'title' => 'Employee Feedback Report',
-            'columns' => [
-                ['key' => 'subject', 'label' => 'Subject'],
-                ['key' => 'name', 'label' => 'Submitted By'],
-                ['key' => 'branch_name', 'label' => 'Branch'],
-                ['key' => 'status', 'label' => 'Status'],
-                ['key' => 'created_at', 'label' => 'Created'],
-            ],
-            'rows' => $this->finalizeRows($query, $paginate, fn ($feedback) => [
-                'subject' => $feedback->subject,
-                'name' => $feedback->name,
-                'branch_name' => $feedback->branch?->name ?? 'N/A',
-                'status' => $feedback->status,
-                'created_at' => $feedback->created_at?->format('Y-m-d H:i'),
-            ]),
-        ];
-    }
-
     private function complaintTrendReport(array $filters, Authenticatable $user, bool $paginate): array
     {
         $query = $this->complaintQuery($filters, $user)
@@ -305,7 +276,7 @@ class ReportService
             ->selectRaw('COUNT(*) as total')
             ->selectRaw('SUM(CASE WHEN status IN ("resolved", "closed") THEN 1 ELSE 0 END) as resolved_count')
             ->selectRaw('SUM(CASE WHEN status = "reopened" THEN 1 ELSE 0 END) as reopened_count')
-            ->selectRaw('SUM(CASE WHEN EXISTS (SELECT 1 FROM sla_escalations WHERE sla_escalations.complaint_id = complaints.id) THEN 1 ELSE 0 END) as escalated_count')
+            ->selectRaw('SUM(CASE WHEN escalation_level > 0 THEN 1 ELSE 0 END) as escalated_count')
             ->groupBy('report_date')
             ->orderByDesc('report_date');
 
@@ -364,69 +335,31 @@ class ReportService
 
     private function escalationReport(array $filters, Authenticatable $user, bool $paginate): array
     {
-        $query = SlaEscalation::query()
-            ->join('complaints', 'complaints.id', '=', 'sla_escalations.complaint_id')
-            ->join('branches', 'branches.id', '=', 'complaints.branch_id')
-            ->select([
-                'sla_escalations.id',
-                'sla_escalations.old_status',
-                'sla_escalations.new_status',
-                'sla_escalations.note',
-                'sla_escalations.notified',
-                'sla_escalations.created_at',
-                'complaints.reference_no',
-                'complaints.subject',
-                'branches.name as branch_name',
-            ]);
-
-        if (! empty($filters['branch'])) {
-            $query->where('complaints.branch_id', $filters['branch']);
-        }
-
-        if (! empty($filters['status'])) {
-            $query->where('complaints.status', $filters['status']);
-        }
-
-        if (! empty($filters['category'])) {
-            $query->where('complaints.category', $filters['category']);
-        }
-
-        if (! empty($filters['from_date'])) {
-            $query->whereDate('sla_escalations.created_at', '>=', $filters['from_date']);
-        }
-
-        if (! empty($filters['to_date'])) {
-            $query->whereDate('sla_escalations.created_at', '<=', $filters['to_date']);
-        }
-
-        if (method_exists($user, 'isDepartmentScopedReviewer') && $user->isDepartmentScopedReviewer()) {
-            $query->where('complaints.department_id', $user->department_id);
-        } elseif (method_exists($user, 'hasRole') && $user->hasRole('Supervisor') && isset($user->branch_id)) {
-            $query->where('complaints.branch_id', $user->branch_id);
-        } elseif (method_exists($user, 'hasRole') && ($user->hasRole('Employee') || $user->hasRole('Customer'))) {
-            $query->where(function ($builder) use ($user): void {
-                $builder->where('complaints.submitted_by_user_id', $user->id)
-                    ->orWhere('complaints.assigned_to_user_id', $user->id);
+        $query = ComplaintStatusHistory::query()
+            ->with(['complaint.branch', 'actor', 'toAssignee'])
+            ->whereIn('action', ['escalated_to_department_head', 'escalated_to_upper_management'])
+            ->whereHas('complaint', function (Builder $complaintQuery) use ($filters, $user): void {
+                $this->applyComplaintFilterValues($complaintQuery, $filters);
+                $this->applyComplaintScope($complaintQuery, $user);
             });
-        }
 
         return [
-            'title' => 'Escalation Report',
+            'title' => 'Complaint Escalation Report',
             'columns' => [
                 ['key' => 'reference_no', 'label' => 'Reference'],
-                ['key' => 'subject', 'label' => 'Subject'],
-                ['key' => 'branch_name', 'label' => 'Branch'],
-                ['key' => 'old_status', 'label' => 'From'],
-                ['key' => 'new_status', 'label' => 'To'],
+                ['key' => 'action', 'label' => 'Escalation Level'],
+                ['key' => 'actor_name', 'label' => 'Sent By'],
+                ['key' => 'recipient_name', 'label' => 'Assigned To'],
+                ['key' => 'escalation_reason', 'label' => 'Reason'],
                 ['key' => 'created_at', 'label' => 'Escalated At'],
             ],
-            'rows' => $this->finalizeRows($query->orderByDesc('sla_escalations.created_at'), $paginate, fn ($row) => [
-                'reference_no' => $row->reference_no,
-                'subject' => $row->subject,
-                'branch_name' => $row->branch_name,
-                'old_status' => $row->old_status,
-                'new_status' => $row->new_status,
-                'created_at' => Carbon::parse($row->created_at)->format('Y-m-d H:i'),
+            'rows' => $this->finalizeRows($query->orderByDesc('created_at'), $paginate, fn ($row) => [
+                'reference_no' => $row->complaint?->reference_no,
+                'action' => $row->action === 'escalated_to_department_head' ? 'Department Head' : 'Upper Management',
+                'actor_name' => $row->actor?->name ?? 'System',
+                'recipient_name' => $row->toAssignee?->name ?? 'Unassigned',
+                'escalation_reason' => $row->escalation_reason,
+                'created_at' => $row->created_at?->format('Y-m-d H:i'),
             ]),
         ];
     }
@@ -459,27 +392,7 @@ class ReportService
 
     private function complaintQuery(array $filters, Authenticatable $user): Builder
     {
-        $query = Complaint::query();
-
-        if (! empty($filters['branch'])) {
-            $query->where('branch_id', $filters['branch']);
-        }
-
-        if (! empty($filters['status'])) {
-            $query->where('status', $filters['status']);
-        }
-
-        if (! empty($filters['category'])) {
-            $query->where('category', $filters['category']);
-        }
-
-        if (! empty($filters['from_date'])) {
-            $query->whereDate('created_at', '>=', $filters['from_date']);
-        }
-
-        if (! empty($filters['to_date'])) {
-            $query->whereDate('created_at', '<=', $filters['to_date']);
-        }
+        $query = $this->applyComplaintFilterValues(Complaint::query(), $filters);
 
         if (! empty($filters['product'])) {
             $branchIds = DB::table('branch_products')
@@ -493,48 +406,55 @@ class ReportService
         return $this->applyComplaintScope($query, $user);
     }
 
-    private function feedbackQuery(array $filters, Authenticatable $user): Builder
+    private function applyComplaintFilterValues(Builder $query, array $filters): Builder
     {
-        $query = Feedback::query();
+        return $query
+            ->when(! empty($filters['branch']), fn ($builder) => $builder->where('branch_id', $filters['branch']))
+            ->when(! empty($filters['department']), fn ($builder) => $builder->where('department_id', $filters['department']))
+            ->when(! empty($filters['status']), fn ($builder) => $builder->where('status', $filters['status']))
+            ->when(! empty($filters['category']), fn ($builder) => $builder->where('category', $filters['category']))
+            ->when(! empty($filters['from_date']), fn ($builder) => $builder->whereDate('created_at', '>=', $filters['from_date']))
+            ->when(! empty($filters['to_date']), fn ($builder) => $builder->whereDate('created_at', '<=', $filters['to_date']));
+    }
 
-        if (! empty($filters['branch'])) {
-            $query->where('branch_id', $filters['branch']);
+    private function feedbackSubmissionCount(array $filters): int
+    {
+        $tickets = FeedbackTicket::query();
+
+        $customerFeedback = Feedback::query()->where('type', 'customer')->whereNotNull('user_id');
+        $customerComplaints = Complaint::query()->whereHas('submitter', fn (Builder $submitter) => $submitter->role('Customer'));
+        foreach ([$tickets, $customerFeedback, $customerComplaints] as $query) {
+            if (! empty($filters['branch'])) {
+                $query->where('branch_id', $filters['branch']);
+            }
+            if (! empty($filters['department'])) {
+                $query->where('department_id', $filters['department']);
+            }
+            if (! empty($filters['from_date'])) {
+                $query->whereDate('created_at', '>=', $filters['from_date']);
+            }
+            if (! empty($filters['to_date'])) {
+                $query->whereDate('created_at', '<=', $filters['to_date']);
+            }
+            if (! empty($filters['product'])) {
+                $branchIds = DB::table('branch_products')->where('product_id', $filters['product'])->pluck('branch_id');
+                $query->whereIn('branch_id', $branchIds->isNotEmpty() ? $branchIds : [0]);
+            }
         }
 
-        if (! empty($filters['status'])) {
-            $query->where('status', $filters['status']);
-        }
-
-        if (! empty($filters['from_date'])) {
-            $query->whereDate('created_at', '>=', $filters['from_date']);
-        }
-
-        if (! empty($filters['to_date'])) {
-            $query->whereDate('created_at', '<=', $filters['to_date']);
-        }
-
-        if (method_exists($user, 'isDepartmentScopedReviewer') && $user->isDepartmentScopedReviewer()) {
-            $query->where('department_id', $user->department_id);
-        } elseif (method_exists($user, 'hasRole') && $user->hasRole('Supervisor') && isset($user->branch_id)) {
-            $query->where('branch_id', $user->branch_id);
-        } elseif (method_exists($user, 'hasRole') && ($user->hasRole('Employee') || $user->hasRole('Customer'))) {
-            $query->where('user_id', $user->id);
-        }
-
-        return $query;
+        return $tickets->count() + $customerFeedback->count() + $customerComplaints->count();
     }
 
     private function applyComplaintScope(Builder $query, Authenticatable $user): Builder
     {
-        if (method_exists($user, 'isDepartmentScopedReviewer') && $user->isDepartmentScopedReviewer()) {
-            $query->where('department_id', $user->department_id);
-        } elseif (method_exists($user, 'hasRole') && $user->hasRole('Supervisor') && isset($user->branch_id)) {
-            $query->where('branch_id', $user->branch_id);
+        if (method_exists($user, 'hasRole') && $user->hasRole('Supervisor')) {
+            $query->where('assigned_to_user_id', $user->id)->where('escalation_level', 0);
+        } elseif (method_exists($user, 'hasRole') && $user->hasRole('Department Head')) {
+            $query->where('assigned_to_user_id', $user->id)->where('escalation_level', 1);
+        } elseif (method_exists($user, 'hasRole') && $user->hasRole('Upper Management')) {
+            $query->where('assigned_to_user_id', $user->id)->where('escalation_level', 2);
         } elseif (method_exists($user, 'hasRole') && ($user->hasRole('Employee') || $user->hasRole('Customer'))) {
-            $query->where(function (Builder $scope) use ($user): void {
-                $scope->where('submitted_by_user_id', $user->id)
-                    ->orWhere('assigned_to_user_id', $user->id);
-            });
+            $query->where('submitted_by_user_id', $user->id);
         }
 
         return $query;
@@ -586,6 +506,10 @@ class ReportService
             $query->where('complaints.branch_id', $filters['branch']);
         }
 
+        if (! empty($filters['department'])) {
+            $query->where('complaints.department_id', $filters['department']);
+        }
+
         if (! empty($filters['status'])) {
             $query->where('complaints.status', $filters['status']);
         }
@@ -602,14 +526,15 @@ class ReportService
             $query->whereDate('complaints.created_at', '<=', $filters['to_date']);
         }
 
-        if (method_exists($user, 'isDepartmentScopedReviewer') && $user->isDepartmentScopedReviewer()) {
-            $query->where('complaints.department_id', $user->department_id);
-        } elseif (method_exists($user, 'hasRole') && $user->hasRole('Supervisor') && isset($user->branch_id)) {
-            $query->where('complaints.branch_id', $user->branch_id);
+        if (method_exists($user, 'hasRole') && $user->hasRole('Supervisor')) {
+            $query->where('complaints.assigned_to_user_id', $user->id)->where('complaints.escalation_level', 0);
+        } elseif (method_exists($user, 'hasRole') && $user->hasRole('Department Head')) {
+            $query->where('complaints.assigned_to_user_id', $user->id)->where('complaints.escalation_level', 1);
+        } elseif (method_exists($user, 'hasRole') && $user->hasRole('Upper Management')) {
+            $query->where('complaints.assigned_to_user_id', $user->id)->where('complaints.escalation_level', 2);
         } elseif (method_exists($user, 'hasRole') && ($user->hasRole('Employee') || $user->hasRole('Customer'))) {
             $query->where(function ($builder) use ($user): void {
-                $builder->where('complaints.submitted_by_user_id', $user->id)
-                    ->orWhere('complaints.assigned_to_user_id', $user->id);
+                $builder->where('complaints.submitted_by_user_id', $user->id);
             });
         }
     }
@@ -684,20 +609,14 @@ class ReportService
 
     private function escalatedComplaintCount(Builder $query): int
     {
-        return (clone $query)
-            ->whereExists(function ($subquery) {
-                $subquery->selectRaw('1')
-                    ->from('sla_escalations')
-                    ->whereColumn('sla_escalations.complaint_id', 'complaints.id');
-            })
-            ->count();
+        return (clone $query)->where('escalation_level', '>', 0)->count();
     }
 
     private function escalatedComplaintsSubquery()
     {
-        return DB::table('sla_escalations')
-            ->select('complaint_id')
-            ->distinct();
+        return DB::table('complaints')
+            ->where('escalation_level', '>', 0)
+            ->selectRaw('id as complaint_id');
     }
 
     private function resolutionDaysExpression(): string

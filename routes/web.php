@@ -9,7 +9,7 @@ use App\Http\Controllers\BranchController;
 use App\Http\Controllers\ComplaintController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
-use App\Http\Controllers\EmployeeFeedbackController;
+use App\Http\Controllers\ComplaintWorkflowController;
 use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\FeedbackController;
 use App\Http\Controllers\GlobalSearchController;
@@ -67,11 +67,11 @@ Route::post('feedback/{branch}/{department?}', [PublicFeedbackController::class,
 
 Route::middleware(['auth', 'verified', 'force.ssl'])->group(function () {
     Route::get('/dashboard', DashboardController::class)
-        ->middleware('permission:view dashboard|manage complaints|submit feedback|submit complaints')
+        ->middleware('permission:view dashboard|manage complaints')
         ->name('dashboard');
 
     Route::get('/dashboard/metrics', [DashboardController::class, 'metrics'])
-        ->middleware('permission:view dashboard|manage complaints|submit feedback|submit complaints')
+        ->middleware('permission:view dashboard|manage complaints')
         ->name('dashboard.metrics');
 
     Route::get('/search', GlobalSearchController::class)->name('search');
@@ -116,24 +116,27 @@ Route::middleware(['auth', 'verified', 'force.ssl'])->group(function () {
     Route::patch('complaints/{complaint}/close', [ComplaintController::class, 'close'])
         ->middleware(['permission:close complaints', 'branch.access:complaint'])
         ->name('complaints.close');
+    Route::patch('complaints/{complaint}/start', [ComplaintController::class, 'start'])
+        ->middleware('permission:manage complaints')
+        ->name('complaints.start');
     Route::patch('complaints/{complaint}/reopen', [ComplaintController::class, 'reopen'])
         ->middleware(['permission:reopen complaints', 'branch.access:complaint'])
         ->name('complaints.reopen');
-
-    Route::resource('employee-feedback', EmployeeFeedbackController::class)
-        ->middleware('permission:manage feedback|submit feedback');
-    Route::patch('employee-feedback/{employeeFeedback}/status', [EmployeeFeedbackController::class, 'updateStatus'])
-        ->middleware('permission:manage feedback|submit feedback')
-        ->name('employee-feedback.status.update');
-    Route::patch('employee-feedback/{employeeFeedback}/reopen', [EmployeeFeedbackController::class, 'reopen'])
-        ->middleware('permission:manage feedback|submit feedback')
-        ->name('employee-feedback.reopen');
-    Route::patch('employee-feedback/{employeeFeedback}/close', [EmployeeFeedbackController::class, 'close'])
-        ->middleware('permission:manage feedback|submit feedback')
-        ->name('employee-feedback.close');
-    Route::patch('employee-feedback/{employeeFeedback}/notes', [EmployeeFeedbackController::class, 'updateNotes'])
-        ->middleware('permission:manage feedback')
-        ->name('employee-feedback.notes.update');
+    Route::post('complaints/{complaint}/escalate/department-head', [ComplaintWorkflowController::class, 'escalateToDepartmentHead'])
+        ->middleware('permission:manage complaints')
+        ->name('complaints.escalate.department-head');
+    Route::post('complaints/{complaint}/escalate/upper-management', [ComplaintWorkflowController::class, 'escalateToUpperManagement'])
+        ->middleware('permission:manage complaints')
+        ->name('complaints.escalate.upper-management');
+    Route::post('complaints/{complaint}/return-to-supervisor', [ComplaintWorkflowController::class, 'returnToSupervisor'])
+        ->middleware('permission:manage complaints')
+        ->name('complaints.return-to-supervisor');
+    Route::post('complaints/{complaint}/resolve', [ComplaintWorkflowController::class, 'resolve'])
+        ->middleware('permission:manage complaints')
+        ->name('complaints.resolve');
+    Route::post('complaints/{complaint}/internal-notes', [ComplaintWorkflowController::class, 'note'])
+        ->middleware('permission:manage complaints')
+        ->name('complaints.internal-notes.store');
 
     // Business types removed — feature deprecated.
 

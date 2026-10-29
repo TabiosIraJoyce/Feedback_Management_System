@@ -52,7 +52,7 @@
                     <x-input-error :messages="$errors->get('role')" class="mt-2 text-sm" />
                 </div>
                 <div>
-                    <x-input-label for="new-user-branch" value="Department" />
+                    <x-input-label for="new-user-branch" value="Branch" />
                     <select id="new-user-branch" name="branch_id" class="mt-1 block w-full rounded-xl border-slate-300 bg-white text-slate-900 shadow-sm focus:border-cyan-500 focus:ring-cyan-500">
                         <option value="">Unassigned</option>
                         @foreach ($branches as $branch)
@@ -60,6 +60,16 @@
                         @endforeach
                     </select>
                     <x-input-error :messages="$errors->get('branch_id')" class="mt-2 text-sm" />
+                </div>
+                <div>
+                    <x-input-label for="new-user-department" value="Department" />
+                    <select id="new-user-department" name="department_id" class="mt-1 block w-full rounded-xl border-slate-300 bg-white text-slate-900 shadow-sm focus:border-cyan-500 focus:ring-cyan-500">
+                        <option value="">Unassigned</option>
+                        @foreach ($departments as $department)
+                            <option value="{{ $department->id }}" @selected(old('department_id') == $department->id)>{{ $department->branch?->name }} · {{ $department->name }}</option>
+                        @endforeach
+                    </select>
+                    <x-input-error :messages="$errors->get('department_id')" class="mt-2 text-sm" />
                 </div>
                 <div class="lg:col-span-2">
                     <x-input-label for="new-user-title" value="Job Title" />
@@ -103,11 +113,20 @@
                         </select>
                     </div>
                     <div>
-                        <x-input-label :for="'user-branch-'.$user->id" value="Department" />
+                        <x-input-label :for="'user-branch-'.$user->id" value="Branch" />
                         <select id="user-branch-{{ $user->id }}" name="branch_id" class="mt-1 block w-full rounded-xl border-slate-300 bg-white text-slate-900 shadow-sm focus:border-cyan-500 focus:ring-cyan-500">
                             <option value="">Unassigned</option>
                             @foreach ($branches as $branch)
                                 <option value="{{ $branch->id }}" @selected($user->branch_id === $branch->id)>{{ $branch->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <x-input-label :for="'user-department-'.$user->id" value="Department" />
+                        <select id="user-department-{{ $user->id }}" name="department_id" class="mt-1 block w-full rounded-xl border-slate-300 bg-white text-slate-900 shadow-sm focus:border-cyan-500 focus:ring-cyan-500">
+                            <option value="">Unassigned</option>
+                            @foreach ($departments as $department)
+                                <option value="{{ $department->id }}" @selected($user->department_id === $department->id)>{{ $department->branch?->name }} · {{ $department->name }}</option>
                             @endforeach
                         </select>
                     </div>

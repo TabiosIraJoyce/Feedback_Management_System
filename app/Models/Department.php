@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\EmployeeFeedback;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -79,11 +78,6 @@ class Department extends Model
     public function formSubmissions(): HasMany
     {
         return $this->hasMany(FormSubmission::class);
-    }
-
-    public function employeeFeedback(): HasMany
-    {
-        return $this->hasMany(EmployeeFeedback::class);
     }
 
     public function users(): HasMany

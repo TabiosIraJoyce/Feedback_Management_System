@@ -9,20 +9,22 @@ use App\Models\Complaint;
 use App\Models\Department;
 use App\Models\Feedback;
 use App\Services\AttachmentUploadService;
+use App\Services\ComplaintWorkflowService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 class FeedbackController extends Controller
 {
-    public function __construct(private AttachmentUploadService $attachments)
+    public function __construct(private AttachmentUploadService $attachments, private ComplaintWorkflowService $workflow)
     {
     }
 
     public function index(Request $request): View
     {
+        $this->authorize('viewAny', Feedback::class);
         $user = $request->user();
-        $feedback = Feedback::with(['branch', 'department', 'user', 'attachments']);
+        $feedback = Feedback::query()->where('type', 'customer')->with(['branch', 'department', 'user', 'attachments']);
 
         if ($user->isDepartmentScopedReviewer()) {
             $feedback->where('department_id', $user->department_id);
@@ -72,6 +74,7 @@ class FeedbackController extends Controller
                 'sentiment' => 'negative',
                 'allow_public_reopen' => true,
             ]);
+            $this->workflow->assignOnSubmission($complaint);
 
             $this->attachments->uploadMany($complaint, $request->file('attachments', []), $request->user());
 
@@ -86,7 +89,7 @@ class FeedbackController extends Controller
             'name' => $payload['name'],
             'email' => $payload['email'] ?? null,
             'subject' => $payload['subject'],
-            'type' => $payload['type'],
+            'type' => 'customer',
             'status' => 'submitted',
             'message' => $payload['message'],
             'sentiment' => $payload['sentiment'] ?? null,
@@ -100,6 +103,7 @@ class FeedbackController extends Controller
 
     public function show(Feedback $feedback): View
     {
+        abort_unless($feedback->type === 'customer', 404);
         $this->authorize('view', $feedback);
 
         $feedback->load(['attachments.uploadedBy']);
@@ -109,6 +113,7 @@ class FeedbackController extends Controller
 
     public function edit(Feedback $feedback): View
     {
+        abort_unless($feedback->type === 'customer', 404);
         $this->authorize('update', $feedback);
 
         return view('feedback.edit', [
@@ -120,6 +125,7 @@ class FeedbackController extends Controller
 
     public function update(UpdateFeedbackRequest $request, Feedback $feedback): RedirectResponse
     {
+        abort_unless($feedback->type === 'customer', 404);
         $this->authorize('update', $feedback);
 
         $payload = $request->validated();
@@ -129,6 +135,7 @@ class FeedbackController extends Controller
         }
 
         $payload['branch_id'] = $this->resolveBranchId($payload);
+        $payload['type'] = 'customer';
 
         $feedback->update($payload);
         $this->attachments->uploadMany($feedback, $request->file('attachments', []), $request->user());
@@ -139,6 +146,7 @@ class FeedbackController extends Controller
 
     public function destroy(Feedback $feedback): RedirectResponse
     {
+        abort_unless($feedback->type === 'customer', 404);
         $this->authorize('delete', $feedback);
 
         $feedback->delete();

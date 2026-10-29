@@ -49,8 +49,6 @@
 
                 if (isset($data['complaint_id'])) {
                     $title = __('Complaint Update');
-                } elseif (isset($data['employee_feedback_id'])) {
-                    $title = __('Employee Feedback Update');
                 }
 
                 return [

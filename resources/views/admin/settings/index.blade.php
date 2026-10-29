@@ -57,6 +57,22 @@
 
                 <aside class="space-y-6">
                     <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+                        <h3 class="text-lg font-semibold text-slate-950 dark:text-slate-100">Complaint Routing</h3>
+                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Select the single authenticated recipient for final escalations.</p>
+                        <div class="mt-5">
+                            <x-input-label for="upper_management_user_id" value="Upper Management Recipient" />
+                            <select id="upper_management_user_id" name="upper_management_user_id" class="mt-1 block w-full rounded-xl border-slate-300 bg-white px-3 py-3 text-sm shadow-sm focus:border-cyan-500 focus:ring-cyan-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100">
+                                <option value="">Not configured</option>
+                                @foreach ($upperManagementUsers as $managementUser)
+                                    <option value="{{ $managementUser->id }}" @selected(old('upper_management_user_id', $settings['upper_management_user_id'] ?? '') == $managementUser->id)>{{ $managementUser->name }} · {{ $managementUser->email }}</option>
+                                @endforeach
+                            </select>
+                            <x-input-error :messages="$errors->get('upper_management_user_id')" class="mt-2" />
+                            <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">Create and activate an account with the Upper Management role in User Access Management first.</p>
+                        </div>
+                    </section>
+
+                    <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
                         <h3 class="text-lg font-semibold text-slate-950 dark:text-slate-100">Preferences</h3>
                         <div class="mt-5 space-y-4">
                             <label class="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 p-4 dark:border-slate-800">

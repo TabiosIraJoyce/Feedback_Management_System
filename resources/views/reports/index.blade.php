@@ -54,6 +54,16 @@
                     </label>
 
                     <label class="block text-sm text-slate-600 dark:text-slate-300">
+                        Department
+                        <select name="department" class="mt-2 block w-full rounded-3xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-cyan-500 focus:ring-cyan-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100">
+                            <option value="">All departments</option>
+                            @foreach ($options['departments'] as $department)
+                                <option value="{{ $department->id }}" @selected((string) $filters['department'] === (string) $department->id)>{{ $department->name }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+
+                    <label class="block text-sm text-slate-600 dark:text-slate-300">
                         Status
                         <select name="status" class="mt-2 block w-full rounded-3xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:border-cyan-500 focus:ring-cyan-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100">
                             <option value="">All statuses</option>
@@ -122,6 +132,7 @@
                         @csrf
                         <input type="hidden" name="report" value="{{ $filters['report'] }}">
                         <input type="hidden" name="branch" value="{{ $filters['branch'] }}">
+                        <input type="hidden" name="department" value="{{ $filters['department'] }}">
                         <input type="hidden" name="product" value="{{ $filters['product'] }}">
                         <input type="hidden" name="status" value="{{ $filters['status'] }}">
                         <input type="hidden" name="category" value="{{ $filters['category'] }}">

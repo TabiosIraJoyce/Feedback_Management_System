@@ -22,7 +22,7 @@ class SlaMonitorService
     {
         $results = [];
 
-        $openStatuses = ['pending', 'under_review', 'assigned', 'in_progress', 'reopened'];
+        $openStatuses = ['open', 'pending', 'under_review', 'assigned', 'in_progress', 'reopened'];
 
         $complaints = Complaint::whereIn('status', $openStatuses)->with(['branch', 'assignedTo'])->get();
 
@@ -46,26 +46,18 @@ class SlaMonitorService
         $diffSeconds = $deadline->diffInSeconds($now, false);
         $totalSeconds = $deadline->diffInSeconds($start);
 
-        if ($diffSeconds >= 0) {
-            return 'On Time';
-        }
+        if ($now->greaterThan($deadline)) {
+            $alreadyNotified = SlaEscalation::query()
+                ->where('complaint_id', $complaint->id)
+                ->where('new_status', 'overdue')
+                ->exists();
 
-        // negative means past deadline
-        $overSeconds = abs($diffSeconds);
-
-        // if significantly past SLA, escalate
-        if ($overSeconds > 0) {
-            // mark escalated if not already
-            if ($complaint->status !== 'escalated') {
-                $old = $complaint->status;
-                $complaint->status = 'escalated';
-                $complaint->save();
-
+            if (! $alreadyNotified) {
                 $es = SlaEscalation::create([
                     'complaint_id' => $complaint->id,
-                    'old_status' => $old,
-                    'new_status' => 'escalated',
-                    'note' => 'SLA exceeded — automatic escalation',
+                    'old_status' => $complaint->status,
+                    'new_status' => 'overdue',
+                    'note' => 'SLA deadline exceeded. Complaint remains assigned at its current workflow level.',
                     'notified' => false,
                 ]);
 
@@ -77,15 +69,13 @@ class SlaMonitorService
                     Log::error('SLA notification failed: '.$e->getMessage());
                 }
 
-                return 'Escalated';
             }
 
-            return 'Escalated';
+            return 'Overdue';
         }
 
-        // Near due logic: when remaining time is <= 10% of total SLA
         if ($totalSeconds > 0) {
-            $remaining = $totalSeconds - abs($diffSeconds);
+            $remaining = $now->diffInSeconds($deadline, false);
             if ($remaining / $totalSeconds <= 0.1) {
                 return 'Near Due';
             }

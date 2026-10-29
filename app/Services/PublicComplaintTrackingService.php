@@ -216,6 +216,7 @@ class PublicComplaintTrackingService
             'satisfaction_comment' => ['nullable', 'string', 'max:2000'],
         ])->validate();
 
+        $previousStatus = $complaint->status;
         $complaint->update([
             'satisfaction_rating' => $validated['satisfaction_rating'],
             'satisfaction_comment' => $validated['satisfaction_comment'] ?? null,
@@ -242,7 +243,12 @@ class PublicComplaintTrackingService
 
         ComplaintStatusHistory::create([
             'complaint_id' => $complaint->id,
+            'from_assigned_user_id' => $complaint->assigned_to_user_id,
+            'to_assigned_user_id' => $complaint->assigned_to_user_id,
             'status' => 'reopened',
+            'action' => 'customer_reopened',
+            'previous_status' => $previousStatus,
+            'new_status' => 'reopened',
             'title' => __('Customer Requested Reopen'),
             'note' => $validated['reason'],
             'visible_to_public' => true,

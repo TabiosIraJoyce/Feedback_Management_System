@@ -5,7 +5,6 @@ namespace Database\Seeders;
 use App\Models\Branch;
 use App\Models\Complaint;
 use App\Models\Department;
-use App\Models\EmployeeFeedback;
 use App\Models\Feedback;
 use App\Models\FeedbackTicket;
 use App\Models\Product;
@@ -350,39 +349,10 @@ class DemoDataSeeder extends Seeder
             ]
         );
 
-        Feedback::firstOrCreate(
-            ['subject' => 'Improve branch intake workflow'],
-            [
-                'branch_id' => $cebu->id,
-                'user_id' => $employee->id,
-                'name' => $employee->name,
-                'email' => $employee->email,
-                'type' => 'internal',
-                'status' => 'submitted',
-                'message' => 'The branch would benefit from a simpler intake workflow and clearer handoff notes.',
-            ]
-        );
-
         $operationsDepartment = Department::firstOrCreate(
             ['branch_id' => $cebu->id, 'code' => 'OPS'],
             ['name' => 'Operations Department', 'description' => 'Handles branch operations, shift concerns, and incident routing.', 'status' => 'active']
         );
 
-        EmployeeFeedback::firstOrCreate(
-            ['reference_no' => 'EFB-DEMO01'],
-            [
-                'user_id' => $employee->id,
-                'branch_id' => $cebu->id,
-                'department_id' => $operationsDepartment->id,
-                'employee_name' => $employee->name,
-                'category' => 'operational_concern',
-                'subject' => 'Night shift turnover notes need standardization',
-                'description' => 'Turnover notes are inconsistent between shifts and important pump maintenance issues are sometimes missed.',
-                'priority' => 'high',
-                'status' => 'under_review',
-                'is_anonymous' => false,
-                'last_status_at' => now(),
-            ]
-        );
     }
 }

@@ -30,8 +30,8 @@ class SlaEscalatedNotification extends Notification
     public function toMail($notifiable)
     {
         return (new MailMessage)
-            ->subject('Complaint Escalated: '.$this->complaint->reference_no)
-            ->line('Complaint '.$this->complaint->reference_no.' has exceeded its SLA and was escalated.')
+            ->subject('Overdue Complaint: '.$this->complaint->reference_no)
+            ->line('Complaint '.$this->complaint->reference_no.' has exceeded its SLA deadline and remains assigned at its current workflow level.')
             ->action('View complaint', url(route('complaints.show', $this->complaint->id)))
             ->line('Please attend to this as soon as possible.');
     }

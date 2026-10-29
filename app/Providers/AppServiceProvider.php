@@ -3,11 +3,9 @@
 namespace App\Providers;
 
 use App\Models\Complaint;
-use App\Models\EmployeeFeedback;
 use App\Models\Feedback;
 use App\Services\SettingsService;
 use App\Policies\ComplaintPolicy;
-use App\Policies\EmployeeFeedbackPolicy;
 use App\Policies\FeedbackPolicy;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
@@ -27,7 +25,6 @@ class AppServiceProvider extends ServiceProvider
     {
         Gate::policy(Complaint::class, ComplaintPolicy::class);
         Gate::policy(Feedback::class, FeedbackPolicy::class);
-        Gate::policy(EmployeeFeedback::class, EmployeeFeedbackPolicy::class);
 
         View::composer(['layouts.app', 'layouts.guest'], function ($view): void {
             $view->with([

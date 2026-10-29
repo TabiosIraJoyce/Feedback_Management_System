@@ -36,7 +36,7 @@ class StoreFeedbackRequest extends FormRequest
             'email' => ['nullable', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50'],
             'subject' => ['required', 'string', 'max:255'],
-            'type' => ['required', 'in:internal,customer'],
+            'type' => ['required', 'in:customer'],
             'message' => ['required', 'string', 'min:10'],
             'sentiment' => [Rule::requiredIf($this->user()?->hasRole('Customer')), 'in:positive,negative'],
             'attachments' => ['nullable', 'array'],

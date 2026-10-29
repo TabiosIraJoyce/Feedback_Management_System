@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\UpdateSystemSettingsRequest;
 use App\Models\Setting;
+use App\Models\User;
 use App\Services\SettingsService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -19,6 +20,7 @@ class SystemSettingsController extends Controller
 
         return view('admin.settings.index', [
             'settings' => $settings,
+            'upperManagementUsers' => User::role('Upper Management')->where('is_active', true)->orderBy('name')->get(['id', 'name', 'email']),
         ]);
     }
 
@@ -53,6 +55,9 @@ class SystemSettingsController extends Controller
 
         SettingsService::set('enable_notifications', $validated['enable_notifications'] ?? false);
         SettingsService::set('enable_dark_mode', $validated['enable_dark_mode'] ?? false);
+        if (array_key_exists('upper_management_user_id', $validated)) {
+            SettingsService::set('upper_management_user_id', (string) ($validated['upper_management_user_id'] ?? ''), 'string', 'complaint_routing');
+        }
 
         // qr_defaults as json
         if (isset($validated['qr_defaults'])) {

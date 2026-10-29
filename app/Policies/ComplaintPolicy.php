@@ -16,45 +16,52 @@ class ComplaintPolicy
 
     public function view(User $user, Complaint $complaint): bool
     {
-        if ($user->can('manage complaints') && ! $user->isScopedReviewer()) {
+        if ($user->hasRole(['Admin', 'Super Admin'])) {
             return true;
         }
 
-        if ($user->isScopedReviewer()) {
-            return $user->canReviewScopedRecord($complaint);
+        if ((int) $complaint->submitted_by_user_id === (int) $user->id) {
+            return true;
         }
 
-        return (int) $complaint->submitted_by_user_id === (int) $user->id
-            || (int) $complaint->assigned_to_user_id === (int) $user->id;
+        if ((int) $complaint->assigned_to_user_id !== (int) $user->id) {
+            return false;
+        }
+
+        return match ((int) $complaint->escalation_level) {
+            0 => $user->hasRole('Supervisor'),
+            1 => $user->hasRole('Department Head') && (int) $user->department_id === (int) $complaint->department_id,
+            2 => $user->hasRole('Upper Management'),
+            default => false,
+        };
     }
 
     public function create(User $user): bool
     {
-        return $user->can('submit complaints') || $user->can('manage complaints');
+        return ! $user->hasRole(['Employee', 'Admin', 'Super Admin', 'Upper Management'])
+            && $user->can('submit complaints');
     }
 
     public function update(User $user, Complaint $complaint): bool
     {
-        if ($user->can('manage complaints') && ! $user->isScopedReviewer()) {
-            return true;
-        }
-
-        if ($user->isScopedReviewer()) {
-            return $user->canReviewScopedRecord($complaint);
-        }
-
-        return (int) $complaint->submitted_by_user_id === (int) $user->id
+        return (int) $complaint->assigned_to_user_id === (int) $user->id
+            && match ((int) $complaint->escalation_level) {
+                0 => $user->hasRole('Supervisor'),
+                1 => $user->hasRole('Department Head') && (int) $user->department_id === (int) $complaint->department_id,
+                2 => $user->hasRole('Upper Management'),
+                default => false,
+            }
             && ! in_array($complaint->status, ['closed', 'resolved'], true);
     }
 
     public function delete(User $user, Complaint $complaint): bool
     {
-        return $user->can('manage complaints') && ! $user->isScopedReviewer();
+        return $user->hasRole(['Admin', 'Super Admin']);
     }
 
     public function restore(User $user, Complaint $complaint): bool
     {
-        return $user->can('manage complaints');
+        return $user->hasRole(['Admin', 'Super Admin']);
     }
 
     public function forceDelete(User $user, Complaint $complaint): bool

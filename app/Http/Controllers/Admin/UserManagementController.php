@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRoleRequest;
 use App\Models\Branch;
+use App\Models\Department;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -19,6 +20,7 @@ class UserManagementController extends Controller
             'users' => User::with(['branch', 'department.branch', 'roles'])->orderBy('name')->get(),
             'roles' => Role::orderBy('name')->get(),
             'branches' => Branch::orderBy('name')->get(),
+            'departments' => Department::with('branch')->orderBy('name')->get(),
         ]);
     }
 
@@ -32,7 +34,7 @@ class UserManagementController extends Controller
             'password' => $validated['password'],
             'job_title' => $validated['job_title'] ?? null,
             'branch_id' => $validated['branch_id'] ?? null,
-            'department_id' => null,
+            'department_id' => $validated['department_id'] ?? null,
             'is_active' => (bool) ($validated['is_active'] ?? false),
         ]);
 
@@ -50,7 +52,7 @@ class UserManagementController extends Controller
             'email' => $validated['email'],
             'job_title' => $validated['job_title'] ?? null,
             'branch_id' => $validated['branch_id'] ?? null,
-            'department_id' => null,
+            'department_id' => $validated['department_id'] ?? null,
             'is_active' => (bool) ($validated['is_active'] ?? false),
         ];
 

@@ -36,7 +36,7 @@ class RolesAndPermissionsSeeder extends Seeder
         }
 
         $roles = [
-            'Super Admin' => $permissions,
+            'Super Admin' => array_values(array_diff($permissions, ['submit feedback', 'submit complaints'])),
             'Admin' => [
                 'manage users',
                 'manage branches',
@@ -49,8 +49,6 @@ class RolesAndPermissionsSeeder extends Seeder
                 'assign complaints',
                 'close complaints',
                 'reopen complaints',
-                'submit feedback',
-                'submit complaints',
                 'track complaints',
             ],
             'Department Head' => [
@@ -75,13 +73,18 @@ class RolesAndPermissionsSeeder extends Seeder
             ],
             'Employee' => [
                 'view dashboard',
-                'submit feedback',
-                'submit complaints',
                 'track complaints',
             ],
             'Customer' => [
                 'submit feedback',
                 'submit complaints',
+                'track complaints',
+            ],
+            'Upper Management' => [
+                'manage complaints',
+                'view dashboard',
+                'close complaints',
+                'reopen complaints',
                 'track complaints',
             ],
         ];

@@ -11,6 +11,7 @@ use App\Models\FeedbackTicket;
 use App\Models\FormSubmission;
 use App\Models\QrCode;
 use App\Services\QrCodeService;
+use App\Services\ComplaintWorkflowService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -23,7 +24,8 @@ use Illuminate\Support\Str;
 class PublicFeedbackController extends Controller
 {
     public function __construct(
-        private QrCodeService $qrCodes
+        private QrCodeService $qrCodes,
+        private ComplaintWorkflowService $complaintWorkflow,
     ) {
     }
 
@@ -497,8 +499,8 @@ public function showSubmission(string $reference): View
         ?string $customerEmail,
         ?string $customerPhone
     ): Model {
-        if ($satisfaction === 'dislike') {
-            return Complaint::create([
+        if ($satisfaction === 'dislike' && ! in_array($category, ['suggestion', 'feedback'], true)) {
+            $complaint = Complaint::create([
                 'branch_id' => $branch->id,
                 'department_id' => $department?->id,
                 'submitted_by_user_id' => null,
@@ -513,6 +515,10 @@ public function showSubmission(string $reference): View
                 'sentiment' => 'negative',
                 'allow_public_reopen' => true,
             ]);
+
+            $this->complaintWorkflow->assignOnSubmission($complaint);
+
+            return $complaint;
         }
 
         return Feedback::create([

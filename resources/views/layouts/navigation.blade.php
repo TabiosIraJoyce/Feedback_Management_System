@@ -216,19 +216,6 @@
         {{ __('Feedback') }}
     </x-admin.sidebar-link>
 
-    {{-- Employee Feedback --}}
-    @if (! auth()->user()->hasRole('Customer'))
-
-        <x-admin.sidebar-link
-            :href="route('employee-feedback.index')"
-            :active="request()->routeIs('employee-feedback.*')"
-            icon="message-square-more"
-        >
-            {{ __('Employee Feedback') }}
-        </x-admin.sidebar-link>
-
-    @endif
-
 @endif
 
                 {{-- ================================================= --}}

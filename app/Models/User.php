@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use Database\Factories\UserFactory;
-use App\Models\EmployeeFeedback;
 use App\Models\Department;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -67,11 +66,6 @@ class User extends Authenticatable
         return $this->hasMany(Feedback::class);
     }
 
-    public function employeeFeedbackEntries(): HasMany
-    {
-        return $this->hasMany(EmployeeFeedback::class);
-    }
-
     public function isDepartmentHead(): bool
     {
         return $this->hasRole('Department Head');
@@ -118,16 +112,16 @@ class User extends Authenticatable
             return false;
         }
 
-        if ($this->isDepartmentScopedReviewer() && property_exists($record, 'department_id')) {
+        if ($this->isDepartmentScopedReviewer() && isset($record->department_id)) {
             return $this->managesDepartment($record->department_id);
         }
 
-        return property_exists($record, 'branch_id') && $this->managesBranch($record->branch_id);
+        return isset($record->branch_id) && $this->managesBranch($record->branch_id);
     }
 
     public static function assignableUsers()
     {
-        $roleNames = collect(['Department Head', 'Supervisor', 'Employee'])
+        $roleNames = collect(['Department Head', 'Supervisor', 'Upper Management'])
             ->filter(fn (string $name): bool => Role::where('name', $name)->exists())
             ->all();
 
